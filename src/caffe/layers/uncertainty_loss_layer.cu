@@ -39,7 +39,12 @@ void UncertaintyLossLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
     }
   }
   if (propagate_down[2]) {
-    bottom[2]->mutable_cpu_diff()[0] = diff_.cpu_diff()[0] * uncertainty_weight_;
+    caffe_gpu_axpby(
+      bottom[2]->count(),
+      uncertainty_weight_ / bottom[2]->count() * top[0]->gpu_diff()[0],
+      diff_.gpu_diff(),
+      Dtype(0),
+      bottom[2]->mutable_gpu_diff());
   }
 }
 

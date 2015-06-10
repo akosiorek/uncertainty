@@ -40,6 +40,7 @@ void UncertaintyLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom
   Dtype dot = caffe_cpu_dot(count, diff_.cpu_data(), diff_.cpu_data());
   Dtype loss = dot / bottom[0]->num() / Dtype(2);
 
+  // computes MSE loss for e.g. classification and adds uncertainty loss
   top[0]->mutable_cpu_data()[0] = loss + computeUncertaintyLoss_cpu(bottom);
 }
 
@@ -69,6 +70,9 @@ void UncertaintyLossLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   }
 }
 
+// computes MSE uncertainty loss. There's one output per sample (e.g. 30 outputs
+// when the minibatch size=30)
+// assumption: bottom[0] - prediction, bottom[1] - groundtruth, bottom[2] - uncertainty measure
 template <typename Dtype>
 Dtype UncertaintyLossLayer<Dtype>::computeUncertaintyLoss_cpu(const vector<Blob<Dtype>*>& bottom) {
 
@@ -78,7 +82,11 @@ Dtype UncertaintyLossLayer<Dtype>::computeUncertaintyLoss_cpu(const vector<Blob<
     int count = bottom[0]->count() / num; // count of groundtruth/predictions per sample
 
     Dtype uncertainty_loss = 0;
+
+    //iterater over samples
     for(int i = 0; i < num; ++i) {
+
+        //find label and prediction
         int prediction = std::distance(prediction_data, std::max(prediction_data, prediction_data + count));
         int label = std::distance(groundtruth_data, std::max(groundtruth_data, groundtruth_data + count));
 
@@ -87,15 +95,18 @@ Dtype UncertaintyLossLayer<Dtype>::computeUncertaintyLoss_cpu(const vector<Blob<
         int expected_uncertainty = (prediction != label);
         Dtype partial_uncertainty_loss = bottom[2]->cpu_data()[i] - expected_uncertainty;
 
-        // store for backprop
+        // store the difference for backprop
         diff_.mutable_cpu_diff()[i] = partial_uncertainty_loss;
-        uncertainty_loss += partial_uncertainty_loss;
+
+        //computes as a sum of squared differences
+        uncertainty_loss += partial_uncertainty_loss * partial_uncertainty_loss;
 
         prediction_data += count;
         groundtruth_data += count;
     }
 
-    return uncertainty_loss * uncertainty_loss * uncertainty_weight_ / Dtype(2) / num;
+    // average over samples, weight and divide by 2
+    return uncertainty_loss * uncertainty_weight_ / Dtype(2) / num;
 }
 
 #ifdef CPU_ONLY
