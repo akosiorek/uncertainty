@@ -48,6 +48,6 @@ void UncertaintyLossLayer<Dtype>::Backward_gpu(const vector<Blob<Dtype>*>& top,
   }
 }
 
-INSTANTIATE_LAYER_GPU_FUNCS(EuclideanLossLayer);
+INSTANTIATE_LAYER_GPU_FUNCS(UncertaintyLossLayer);
 
 }  // namespace caffe
