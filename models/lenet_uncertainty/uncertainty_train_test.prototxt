@@ -166,3 +166,11 @@ layer {
   bottom: "label"
   top: "loss"
 }
+layer {
+  name: "uloss"
+  type: "UncertaintyLoss"
+  bottom: "ip2"
+  bottom: "label"
+  bottom: "uncertainty"
+  top: "uloss"
+}
