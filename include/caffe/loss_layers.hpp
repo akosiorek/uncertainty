@@ -774,7 +774,7 @@ public:
     virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
                          const vector<Blob<Dtype>*>& top);
 
-    virtual inline const char* type() const { return "EuclideanLoss"; }
+    virtual inline const char* type() const { return "UncertaintyLoss"; }
 
     virtual inline bool AllowForceBackward(const int bottom_index) const {
         return true;
