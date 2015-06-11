@@ -4,6 +4,7 @@ layer {
   type: "Data"
   top: "data"
   top: "label"
+  top: "uncertainty"
   include {
     phase: TRAIN
   }
