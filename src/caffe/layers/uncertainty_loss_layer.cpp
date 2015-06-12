@@ -20,8 +20,8 @@ template <typename Dtype>
 void UncertaintyLossLayer<Dtype>::Reshape(
   const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
   LossLayer<Dtype>::Reshape(bottom, top);
-  CHECK_EQ(bottom[0]->count(1), bottom[1]->count(1))
-      << "Inputs must have the same dimension.";
+  //CHECK_EQ(bottom[0]->count(1), bottom[1]->count(1))
+  //    << "Inputs must have the same dimension.";
   CHECK_EQ(bottom[0]->num(), bottom[2]->count())
       << "There must be one uncertainty score per data sample";
 
@@ -88,8 +88,10 @@ Dtype UncertaintyLossLayer<Dtype>::computeUncertaintyLoss_cpu(const vector<Blob<
 
         //find label and prediction
         int prediction = std::distance(prediction_data, std::max(prediction_data, prediction_data + count));
-        int label = std::distance(groundtruth_data, std::max(groundtruth_data, groundtruth_data + count));
-
+        // int label = std::distance(groundtruth_data, std::max(groundtruth_data, groundtruth_data + count));
+	int label = *(groundtruth_data + i*sizeof(Dtype));
+	printf("%d", label);
+	
         // expected_uncertainty: = 1 if prediction != label
         //                       = 0 if prediction == label
         int expected_uncertainty = (prediction != label);

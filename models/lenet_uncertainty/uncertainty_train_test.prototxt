@@ -4,7 +4,6 @@ layer {
   type: "Data"
   top: "data"
   top: "label"
-  top: "uncertainty"
   include {
     phase: TRAIN
   }
@@ -161,17 +160,31 @@ layer {
   }
 }
 layer {
-  name: "loss"
-  type: "SoftmaxWithLoss"
+  name: "uncertainty"
+  type: "InnerProduct"
   bottom: "ip2"
-  bottom: "label"
-  top: "loss"
+  top: "uncertainty"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
 }
 layer {
-  name: "uloss"
+  name: "loss"
   type: "UncertaintyLoss"
   bottom: "ip2"
   bottom: "label"
   bottom: "uncertainty"
-  top: "uloss"
+  top: "loss"
 }
