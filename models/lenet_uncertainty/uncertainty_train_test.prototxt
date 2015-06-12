@@ -180,11 +180,22 @@ layer {
     }
   }
 }
+
 layer {
-  name: "loss"
+  name: "uncertainty_loss"
   type: "UncertaintyLoss"
   bottom: "ip2"
   bottom: "label"
   bottom: "uncertainty"
-  top: "loss"
+  top: "uncertainty_loss"
+  loss_weight: 0.8
+}
+
+layer {
+  name: "softmax_loss"
+  type: "SoftmaxWithLoss"
+  bottom: "ip2"
+  bottom: "label"
+  top: "softmax_loss"
+  loss_weight: 0.2
 }
