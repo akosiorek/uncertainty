@@ -163,7 +163,7 @@ layer {
   name: "uncertainty"
   type: "InnerProduct"
   bottom: "ip2"
-  top: "uncertainty"
+  top: "uncertainty_raw"
   param {
     lr_mult: 1
   }
@@ -182,13 +182,20 @@ layer {
 }
 
 layer {
+  name: "uncertainty_sigmoid"
+  type: "Sigmoid"
+  bottom: "uncertainty_raw"
+  top: "uncertainty"
+}
+
+layer {
   name: "uncertainty_loss"
   type: "UncertaintyLoss"
-  bottom: "ip2"
+  bottom: "uncertainty"
   bottom: "label"
   bottom: "uncertainty"
   top: "uncertainty_loss"
-  loss_weight: 0.8
+  loss_weight: 0.1
 }
 
 layer {
@@ -197,5 +204,5 @@ layer {
   bottom: "ip2"
   bottom: "label"
   top: "softmax_loss"
-  loss_weight: 0.2
+  loss_weight: 0.9
 }
