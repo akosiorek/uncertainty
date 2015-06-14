@@ -154,6 +154,13 @@ layer {
   top: "uncertainty"
 }
 
+#layer {
+#  name: "tanh_unc"
+#  type: "TanH"
+#  bottom: "uncertainty_raw"
+#  top: "uncertainty"
+#}
+
 layer {
   name: "probs"
   type: "Softmax"

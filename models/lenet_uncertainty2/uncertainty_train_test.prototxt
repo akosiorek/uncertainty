@@ -231,19 +231,19 @@ layer {
   }
 }
 
-#layer {
-#  name: "uncertainty_sigmoid"
-#  type: "Sigmoid"
-#  bottom: "uncertainty_raw"
-#  top: "uncertainty"
-#}
-
 layer {
-  name: "tanh_unc"
-  type: "TanH"
+  name: "uncertainty_sigmoid"
+  type: "Sigmoid"
   bottom: "uncertainty_raw"
   top: "uncertainty"
 }
+
+#layer {
+#  name: "tanh_unc"
+#  type: "TanH"
+#  bottom: "uncertainty_raw"
+#  top: "uncertainty"
+#}
 
 layer {
   name: "uncertainty_loss"
