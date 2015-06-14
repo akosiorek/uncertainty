@@ -1,4 +1,7 @@
 name: "UncertaintyNet"
+
+# Added an intermediate inner product layer with relu between unsoftmaxed props and the uncertainty neuron
+
 layer {
   name: "mnist"
   type: "Data"
@@ -16,6 +19,7 @@ layer {
     backend: LMDB
   }
 }
+
 layer {
   name: "mnist"
   type: "Data"
@@ -33,6 +37,7 @@ layer {
     backend: LMDB
   }
 }
+
 layer {
   name: "conv1"
   type: "Convolution"
@@ -56,6 +61,7 @@ layer {
     }
   }
 }
+
 layer {
   name: "pool1"
   type: "Pooling"
@@ -67,6 +73,7 @@ layer {
     stride: 2
   }
 }
+
 layer {
   name: "conv2"
   type: "Convolution"
@@ -122,12 +129,14 @@ layer {
     }
   }
 }
+
 layer {
   name: "relu1"
   type: "ReLU"
   bottom: "ip1"
   top: "ip1"
 }
+
 layer {
   name: "ip2"
   type: "InnerProduct"
@@ -149,6 +158,7 @@ layer {
     }
   }
 }
+
 layer {
   name: "accuracy"
   type: "Accuracy"
@@ -159,10 +169,50 @@ layer {
     phase: TEST
   }
 }
+
+layer {
+  name: "ip_unc1"
+  type: "InnerProduct"
+  bottom: "ip2"
+  top: "ip_unc1"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  inner_product_param {
+    num_output: 50
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+
+layer {
+  name: "relu_unc1"
+  type: "ReLU"
+  bottom: "ip_unc1"
+  top: "ip_unc1"
+}
+
+layer {
+  name: "drop_unc1"
+  type: "Dropout"
+  bottom: "ip_unc1"
+  top: "ip_unc1"
+  dropout_param {
+    dropout_ratio: 0.5
+  }
+}
+
 layer {
   name: "uncertainty"
   type: "InnerProduct"
-  bottom: "ip2"
+  bottom: "ip_unc1"
   top: "uncertainty_raw"
   param {
     lr_mult: 1
@@ -181,9 +231,16 @@ layer {
   }
 }
 
+#layer {
+#  name: "uncertainty_sigmoid"
+#  type: "Sigmoid"
+#  bottom: "uncertainty_raw"
+#  top: "uncertainty"
+#}
+
 layer {
-  name: "uncertainty_sigmoid"
-  type: "Sigmoid"
+  name: "tanh_unc"
+  type: "TanH"
   bottom: "uncertainty_raw"
   top: "uncertainty"
 }
@@ -195,7 +252,7 @@ layer {
   bottom: "label"
   bottom: "uncertainty"
   top: "uncertainty_loss"
-  loss_weight: 0.9
+  loss_weight: 0.5
 }
 
 layer {
@@ -204,5 +261,5 @@ layer {
   bottom: "ip2"
   bottom: "label"
   top: "softmax_loss"
-  loss_weight: 0.1
+  loss_weight: 0.5
 }

@@ -81,6 +81,7 @@ layer {
   bottom: "ip1"
   top: "ip1"
 }
+
 layer {
   name: "ip2"
   type: "InnerProduct"
@@ -96,10 +97,44 @@ layer {
     num_output: 10
   }
 }
+
+layer {
+  name: "ip_unc1"
+  type: "InnerProduct"
+  bottom: "ip2"
+  top: "ip_unc1"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  inner_product_param {
+    num_output: 50
+  }
+}
+
+layer {
+  name: "relu_unc1"
+  type: "ReLU"
+  bottom: "ip_unc1"
+  top: "ip_unc1"
+}
+
+layer {
+  name: "drop_unc1"
+  type: "Dropout"
+  bottom: "ip_unc1"
+  top: "ip_unc1"
+  dropout_param {
+    dropout_ratio: 0.5
+  }
+}
+
 layer {
   name: "uncertainty"
   type: "InnerProduct"
-  bottom: "ip2"
+  bottom: "ip_unc1"
   top: "uncertainty_raw"
   param {
     lr_mult: 1
