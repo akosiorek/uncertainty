@@ -9,7 +9,7 @@ import re
 caffe_root = '../../../'
 
 MODEL_FILE = '../uncertainty_deploy.prototxt'
-PRETRAINED = '../snapshot/unc_lambda_0_9.caffemodel'
+PRETRAINED = '../snapshot/unc2_lambda_0_5_drop_0_5.caffemodel'
 LMDB_TEST =  caffe_root + 'examples/mnist/mnist_test_lmdb'
 
 caffe.set_mode_cpu()
@@ -25,7 +25,6 @@ def perform_tests():
 	env = lmdb.open(LMDB_TEST, readonly=True)
 	with env.begin() as txn:
     		cursor = txn.cursor()
-
 
 		index = 0
 
@@ -43,21 +42,20 @@ def perform_tests():
 			uncertainty =     net.blobs["uncertainty"].data[0]
 			uncertainty_raw = net.blobs["uncertainty_raw"].data[0]
 			ip2 =             net.blobs["ip2"].data[0]
+			ip_unc1 =            net.blobs["ip_unc1"].data[0]
 			
-			y_predicted = probs.argmax()
-
-#			if uncertainty != 0: 
-
+			if uncertainty != 0:			
 #			print "x:          ", x
-			print "test image:     ", index			
-			print "y:              ", y
-  	                print "y predicted:    ", y_predicted
-			print "probs_raw:      ", ip2
-			print "uncertainty_raw:", "%f" % uncertainty_raw
-			print "probs:          ", np.array(probs, dtype=np.dtype(float))
-			print "uncertainty:    ", "%f" % uncertainty
-			
-			print "\n---\n"
+				print "test image:     ", index			
+				print "y:              ", y
+	 	                print "y predicted:    ", probs.argmax()
+				print "uncertainty_ipu:", ip_unc1
+				print "probs_raw:      ", ip2
+				print "uncertainty_raw:", "%f" % uncertainty_raw
+				print "probs:          ", np.array(probs, dtype=np.dtype(float))
+				print "uncertainty:    ", "%f" % uncertainty
+				
+				print "\n---\n"
 			index += 1
 
 			#prediction = net.predict([input_image])  # predict takes any number of images, and formats them for the Caffe net automatically
