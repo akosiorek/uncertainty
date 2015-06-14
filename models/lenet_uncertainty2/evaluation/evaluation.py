@@ -69,8 +69,8 @@ def perform_tests():
 			index += 1
 
 
-	print unc_correct_list
-	print unc_incorrect_list
+	#print unc_correct_list
+	#print unc_incorrect_list
 	print "unc mean correct:   %.2f" % np.mean( unc_correct_list )
         print "unc std correct:    %.2f" % np.std( unc_correct_list )
 	print "unc mean incorrect: %.2f" % np.mean( unc_incorrect_list )
