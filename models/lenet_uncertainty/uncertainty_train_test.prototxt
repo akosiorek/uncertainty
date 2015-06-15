@@ -191,7 +191,7 @@ layer {
 layer {
   name: "uncertainty_loss"
   type: "UncertaintyLoss"
-  bottom: "uncertainty"
+  bottom: "ip2"
   bottom: "label"
   bottom: "uncertainty"
   top: "uncertainty_loss"
