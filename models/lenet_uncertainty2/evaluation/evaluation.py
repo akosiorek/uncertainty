@@ -9,7 +9,7 @@ import re
 caffe_root = '../../../'
 
 MODEL_FILE = '../uncertainty_deploy.prototxt'
-PRETRAINED = '../snapshot/unc2_lambda_0_5_drop_0_5_htan.caffemodel'
+PRETRAINED = '../snapshot/unc2_lambda_0_5_doubledrop_0_5.caffemodel'
 LMDB_TEST =  caffe_root + 'examples/mnist/mnist_test_lmdb'
 
 caffe.set_mode_cpu()
@@ -43,8 +43,9 @@ def perform_tests():
         		probs =           net.blobs["probs"].data[0]
 			uncertainty =     net.blobs["uncertainty"].data[0]
 			uncertainty_raw = net.blobs["uncertainty_raw"].data[0]
+			ip1 =             net.blobs["ip1"].data[0]
 			ip2 =             net.blobs["ip2"].data[0]
-			ip_unc1 =            net.blobs["ip_unc1"].data[0]
+			ip_unc1 =         net.blobs["ip_unc1"].data[0]
 			
 			y_predicted = probs.argmax()
 
@@ -55,17 +56,18 @@ def perform_tests():
 			else:
 				unc_incorrect_list.append( uncertainty[0] )
 			#	print uncertainty
-
-			# print "test image:     ", index			
-			# print "y:              ", y
-	                # print "y predicted:    ", y_predicted
+			
+			print "test image:     ", index			
+			print "y:              ", y
+	                print "y predicted:    ", y_predicted
 #			print "uncertainty_ipu:", ip_unc1
-			# print "probs_raw:      ", ip2
-			# print "uncertainty_raw:", "%f" % uncertainty_raw
-			# print "probs:          ", np.array(probs, dtype=np.dtype(float))
+#			print "ip1:            ", ip1
+			print "probs_raw:      ", ip2
+			print "uncertainty_raw:", "%f" % uncertainty_raw
+			print "probs:          ", np.array(probs, dtype=np.dtype(float))
 			# print "uncertainty:    ", "%f" % uncertainty
 				
-			# print "\n---\n"
+			print "\n---\n"
 			index += 1
 
 
