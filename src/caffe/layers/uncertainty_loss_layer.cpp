@@ -61,9 +61,22 @@ Dtype UncertaintyLossLayer<Dtype>::computeUncertaintyLoss_cpu(const vector<Blob<
     int num = bottom[2]->count(); // count of uncertainty outputs (or samples)
     int count = bottom[0]->count() / num; // count of groundtruth/predictions per sample
 
+	const Dtype* tmp = prediction_data;	
+	int num_correct = 0;
+	int num_misclassified = 0;
+    for(int i = 0; i < num; ++i) 
+    {           
+        int prediction = std::distance(prediction_data, std::max_element(prediction_data, prediction_data +  count));
+        int label = groundtruth_data[i];
+        num_misclassified += (prediction != label);
+
+        prediction_data += count;
+    }          
+		
+	num_correct = num - num_misclassified; 
+	prediction_data = tmp;	
 
     Dtype uncertainty_loss = 0;
-
     //iterater over samples
     for(int i = 0; i < num; ++i) {
 
@@ -75,13 +88,31 @@ Dtype UncertaintyLossLayer<Dtype>::computeUncertaintyLoss_cpu(const vector<Blob<
         // expected_uncertainty: = 1 if prediction != label
         //                       = 0 if prediction == label
         int expected_uncertainty = (prediction != label);
-        Dtype partial_uncertainty_loss = bottom[2]->cpu_data()[i] - expected_uncertainty;
 
-        // store the difference for backprop
+		Dtype partial_uncertainty_loss = bottom[2]->cpu_data()[i] - expected_uncertainty;
+		
+		// Save the derivative for backprop
         diff_.mutable_cpu_diff()[i] = partial_uncertainty_loss;
 
-        //computes as a sum of squared differences
-        uncertainty_loss += partial_uncertainty_loss * partial_uncertainty_loss;
+
+		if(expected_uncertainty == 1)
+		{
+	  		// store the difference for backprop
+          	diff_.mutable_cpu_diff()[i] *= (1/Dtype(num_misclassified));
+			
+          	//computes as a sum of squared differences
+          	uncertainty_loss += (1/Dtype(num_misclassified)) * partial_uncertainty_loss * partial_uncertainty_loss;
+		}
+       	
+		else
+		{
+           // store the difference for backprop
+           diff_.mutable_cpu_diff()[i] *= (1/Dtype(num_correct));
+			
+           //computes as a sum of squared differences
+           uncertainty_loss += (1/Dtype(num_correct)) * partial_uncertainty_loss * partial_uncertainty_loss;
+		} 
+
 
         prediction_data += count;
     }
@@ -89,6 +120,8 @@ Dtype UncertaintyLossLayer<Dtype>::computeUncertaintyLoss_cpu(const vector<Blob<
     // average over samples, weight and divide by 2
     return uncertainty_loss * uncertainty_weight_ / Dtype(2) / num;
 }
+
+
 
 #ifdef CPU_ONLY
 STUB_GPU(UncertaintyLossLayer);
