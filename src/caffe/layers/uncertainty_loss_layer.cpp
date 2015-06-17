@@ -73,7 +73,16 @@ Dtype UncertaintyLossLayer<Dtype>::computeUncertaintyLoss_cpu(const vector<Blob<
         prediction_data += count;
     }          
 		
-	num_correct = num - num_misclassified; 
+	num_correct = num - num_misclassified;
+	
+	// Safety Precaution
+	if(num_correct < 1 || num_misclassified < 1)
+	{ 	
+		num_correct += 1;
+		num_misclassified += 1;
+	}	
+	
+	//prediction_data should point at the first sample
 	prediction_data = tmp;	
 
     Dtype uncertainty_loss = 0;
