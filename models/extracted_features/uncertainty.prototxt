@@ -1,0 +1,179 @@
+name: "UncertaintyNet"
+layer {
+  name: "mnist_ip1"
+  type: "Data"
+  top: "data_ip1"
+  include {
+    phase: TRAIN
+  }
+  data_param {
+    source: "models/lenet_extracted_features/train_lmdb_lenet_ip1"
+    batch_size: 128
+    backend: LMDB
+  }
+}
+layer {
+  name: "mnist_ip2"
+  type: "Data"
+  top: "data_ip2"
+  include {
+    phase: TRAIN
+  }
+  data_param {
+    source: "models/lenet_extracted_features/train_lmdb_lenet_ip2"
+    batch_size: 128
+    backend: LMDB
+  }
+}
+layer {
+  name: "mnist_label"
+  type: "Data"
+  top: "label"
+  include {
+    phase: TRAIN
+  }
+  data_param {
+    source: "models/lenet_extracted_features/train_lmdb_lenet_label"
+    batch_size: 128
+    backend: LMDB
+  }
+}
+
+layer {
+  name: "mnist_ip1"
+  type: "Data"
+  top: "data_ip1"
+  include {
+    phase: TEST
+  }
+  data_param {
+    source: "models/lenet_extracted_features/test_lmdb_lenet_ip1"
+    batch_size: 10000
+    backend: LMDB
+  }
+}
+layer {
+  name: "mnist_ip2"
+  type: "Data"
+  top: "data_ip2"
+  include {
+    phase: TEST
+  }
+  data_param {
+    source: "models/lenet_extracted_features/test_lmdb_lenet_ip2"
+    batch_size: 10000
+    backend: LMDB
+  }
+}
+layer {
+  name: "mnist_data"
+  type: "Data"
+  top: "label"
+  include {
+    phase: TEST
+  }
+  data_param {
+    source: "models/lenet_extracted_features/test_lmdb_lenet_label"
+    batch_size: 10000
+    backend: LMDB
+  }
+}
+layer {
+  name: "data_concat"
+  type: "Concat"
+  bottom: "data_ip1"
+  bottom: "data_ip2"
+  top: "data"
+}
+
+layer {
+  name: "ip1"
+  type: "InnerProduct"
+  bottom: "data"
+  top: "ip1"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  inner_product_param {
+    num_output: 150
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "relu1"
+  type: "ReLU"
+  bottom: "ip1"
+  top: "ip1"
+}
+layer {
+  name: "ip2"
+  type: "InnerProduct"
+  bottom: "ip1"
+  top: "ip2"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  inner_product_param {
+    num_output: 50
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+layer {
+  name: "relu2"
+  type: "ReLU"
+  bottom: "ip2"
+  top: "ip2"
+}
+layer {
+  name: "uncertainty"
+  type: "InnerProduct"
+  bottom: "ip2"
+  top: "uncertainty_raw"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+
+layer {
+  name: "uncertainty_sigmoid"
+  type: "Sigmoid"
+  bottom: "uncertainty_raw"
+  top: "uncertainty"
+}
+
+layer {
+  name: "uncertainty_loss"
+  type: "UncertaintyLoss"
+  bottom: "data_ip2"
+  bottom: "label"
+  bottom: "uncertainty"
+  top: "uncertainty_loss"
+}
