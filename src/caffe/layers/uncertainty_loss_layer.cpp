@@ -50,81 +50,58 @@ void UncertaintyLossLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
   }
 }
 
+
+
+
+
 // computes MSE uncertainty loss. There's one output per sample (e.g. 30 outputs
 // when the minibatch size=30)
 // assumption: bottom[0] - prediction, bottom[1] - groundtruth, bottom[2] - uncertainty measure
 template <typename Dtype>
 Dtype UncertaintyLossLayer<Dtype>::computeUncertaintyLoss_cpu(const vector<Blob<Dtype>*>& bottom) {
 
-    const Dtype* prediction_data =  bottom[0]->cpu_data();
-    const Dtype* groundtruth_data = bottom[1]->cpu_data();
-    int num = bottom[2]->count(); // count of uncertainty outputs (or samples)
-    int count = bottom[0]->count() / num; // count of groundtruth/predictions per sample
+  const Dtype* prediction_data =  bottom[0]->cpu_data();
+  const Dtype* groundtruth_data = bottom[1]->cpu_data();
+  int num = bottom[2]->count(); // count of uncertainty outputs (or samples)
+  int count = bottom[0]->count() / num; // count of groundtruth/predictions per sample
 
-	const Dtype* tmp = prediction_data;	
 	int num_correct = 0;
-	int num_misclassified = 0;
-    for(int i = 0; i < num; ++i) 
-    {           
-        int prediction = std::distance(prediction_data, std::max_element(prediction_data, prediction_data +  count));
-        int label = groundtruth_data[i];
-        num_misclassified += (prediction != label);
+	int num_false = 0;
+  Dtype sum_correct = 0;
+  Dtype sum_false = 0;
+  for(int i = 0; i < num; ++i, prediction_data += count) {
 
-        prediction_data += count;
-    }          
-		
-	num_correct = num - num_misclassified;
-	
-	// Safety Precaution
-	if(num_correct < 1 || num_misclassified < 1)
-	{ 	
-		num_correct += 1;
-		num_misclassified += 1;
-	}	
-	
-	//prediction_data should point at the first sample
-	prediction_data = tmp;	
+    int prediction = std::distance(prediction_data, std::max_element(prediction_data, prediction_data +  count));
+    int label = groundtruth_data[i];
 
-    Dtype uncertainty_loss = 0;
+    num_correct += prediction == label;
+
+    // correct == 1
+    diff_.mutable_cpu_diff()[i] = prediction == label;
+  }
+
+  num_false = num - num_correct;
+
+  Dtype uncertainty_loss = 0;
+
     //iterater over samples
     for(int i = 0; i < num; ++i) {
 
-        int prediction = std::distance(prediction_data, std::max_element(prediction_data, prediction_data + count));
-        int label = groundtruth_data[i];
-
-//        LOG(ERROR) << "prediction: " << prediction << " label: " << label;
-	
-        // expected_uncertainty: = 1 if prediction != label
-        //                       = 0 if prediction == label
-        int expected_uncertainty = (prediction != label);
-
-		Dtype partial_uncertainty_loss = bottom[2]->cpu_data()[i] - expected_uncertainty;
+      Dtype correct = diff_.mutable_cpu_diff()[i];
+	  	Dtype partial_uncertainty_loss = -(correct - bottom[2]->cpu_data()[i]);
+      Dtype weight = diff_.mutable_cpu_diff()[i] ? 1 / Dtype(num_correct) : 1 / Dtype(num_false);
 		
 		// Save the derivative for backprop
-        diff_.mutable_cpu_diff()[i] = partial_uncertainty_loss;
+      diff_.mutable_cpu_diff()[i] = weight * partial_uncertainty_loss;
+      uncertainty_loss += diff_.mutable_cpu_diff()[i] * partial_uncertainty_loss;
 
 
-		if(expected_uncertainty == 1)
-		{
-	  		// store the difference for backprop
-          	diff_.mutable_cpu_diff()[i] *= (1/Dtype(num_misclassified));
-			
-          	//computes as a sum of squared differences
-          	uncertainty_loss += (1/Dtype(num_misclassified)) * partial_uncertainty_loss * partial_uncertainty_loss;
-		}
-       	
-		else
-		{
-           // store the difference for backprop
-           diff_.mutable_cpu_diff()[i] *= (1/Dtype(num_correct));
-			
-           //computes as a sum of squared differences
-           uncertainty_loss += (1/Dtype(num_correct)) * partial_uncertainty_loss * partial_uncertainty_loss;
-		} 
-
-
-        prediction_data += count;
+      sum_correct += correct * bottom[2]->cpu_data()[i];
+      sum_false += !correct * bottom[2]->cpu_data()[i];
     }
+
+    LOG_IF(ERROR, this->phase_ == TEST) << "correct:\tnum: " << num_correct << "\tsum: " << sum_correct << "\tmean: " << sum_correct / num_correct;
+    LOG_IF(ERROR, this->phase_ == TEST) << "false:\tnum: " << num_false << "\tsum: " << sum_false << "\tmean: " << sum_false / num_false;
 
     // average over samples, weight and divide by 2
     return uncertainty_loss * uncertainty_weight_ / Dtype(2) / num;
