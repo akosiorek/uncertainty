@@ -7,8 +7,8 @@ layer {
     phase: TRAIN
   }
   data_param {
-    source: "models/lenet_extracted_features/train_lmdb_lenet_ip1"
-    batch_size: 128
+    source: "models/extracted_features/train_lmdb_lenet_ip1"
+    batch_size: 64
     backend: LMDB
   }
 }
@@ -20,8 +20,8 @@ layer {
     phase: TRAIN
   }
   data_param {
-    source: "models/lenet_extracted_features/train_lmdb_lenet_ip2"
-    batch_size: 128
+    source: "models/extracted_features/train_lmdb_lenet_ip2"
+    batch_size: 64
     backend: LMDB
   }
 }
@@ -33,8 +33,8 @@ layer {
     phase: TRAIN
   }
   data_param {
-    source: "models/lenet_extracted_features/train_lmdb_lenet_label"
-    batch_size: 128
+    source: "models/extracted_features/train_lmdb_lenet_label"
+    batch_size: 64
     backend: LMDB
   }
 }
@@ -47,7 +47,7 @@ layer {
     phase: TEST
   }
   data_param {
-    source: "models/lenet_extracted_features/test_lmdb_lenet_ip1"
+    source: "models/extracted_features/test_lmdb_lenet_ip1"
     batch_size: 10000
     backend: LMDB
   }
@@ -60,7 +60,7 @@ layer {
     phase: TEST
   }
   data_param {
-    source: "models/lenet_extracted_features/test_lmdb_lenet_ip2"
+    source: "models/extracted_features/test_lmdb_lenet_ip2"
     batch_size: 10000
     backend: LMDB
   }
@@ -73,7 +73,7 @@ layer {
     phase: TEST
   }
   data_param {
-    source: "models/lenet_extracted_features/test_lmdb_lenet_label"
+    source: "models/extracted_features/test_lmdb_lenet_label"
     batch_size: 10000
     backend: LMDB
   }
@@ -85,25 +85,61 @@ layer {
   bottom: "data_ip2"
   top: "data"
 }
-
+layer {
+  name: "ip0"
+  type: "InnerProduct"
+  bottom: "data"
+  top: "ip0"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 1
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 750
+     weight_filler {
+       type: "gaussian"
+       std: 1
+       sparse: 15
+     }
+     bias_filler {
+       type: "constant"
+       value: 0
+     }
+  }
+}
+layer {
+  name: "relu0"
+  type: "ReLU"
+  bottom: "ip0"
+  top: "ip0"
+}
 layer {
   name: "ip1"
   type: "InnerProduct"
-  bottom: "data"
+  bottom: "ip0"
   top: "ip1"
   param {
     lr_mult: 1
+    decay_mult: 1
   }
   param {
-    lr_mult: 2
+    lr_mult: 1
+    decay_mult: 0
   }
   inner_product_param {
     num_output: 150
     weight_filler {
-      type: "xavier"
+      type: "gaussian"
+      std: 1
+      sparse: 15
     }
     bias_filler {
       type: "constant"
+      value: 0
     }
   }
 }
@@ -120,17 +156,22 @@ layer {
   top: "ip2"
   param {
     lr_mult: 1
+    decay_mult: 1
   }
   param {
-    lr_mult: 2
+    lr_mult: 1
+    decay_mult: 0
   }
   inner_product_param {
     num_output: 50
     weight_filler {
-      type: "xavier"
+      type: "gaussian"
+      std: 1
+      sparse: 15
     }
     bias_filler {
       type: "constant"
+      value: 0
     }
   }
 }
@@ -153,15 +194,16 @@ layer {
   }
   inner_product_param {
     num_output: 1
-    weight_filler {
-      type: "xavier"
-    }
-    bias_filler {
-      type: "constant"
-    }
+     weight_filler {
+       type: "gaussian"
+       std: 1
+     }
+     bias_filler {
+       type: "constant"
+       value: 0
+     }
   }
 }
-
 layer {
   name: "uncertainty_sigmoid"
   type: "Sigmoid"
