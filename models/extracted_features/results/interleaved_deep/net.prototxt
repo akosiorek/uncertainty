@@ -7,7 +7,7 @@ layer {
     phase: TRAIN
   }
   data_param {
-    source: "models/extracted_features/train_lmdb_lenet_ip1"
+    source: "data/extracted/interleaved/train_lmdb_lenet_ip1"
     batch_size: 64
     backend: LMDB
   }
@@ -20,7 +20,7 @@ layer {
     phase: TRAIN
   }
   data_param {
-    source: "models/extracted_features/train_lmdb_lenet_ip2"
+    source: "data/extracted/interleaved/train_lmdb_lenet_ip2"
     batch_size: 64
     backend: LMDB
   }
@@ -33,7 +33,7 @@ layer {
     phase: TRAIN
   }
   data_param {
-    source: "models/extracted_features/train_lmdb_lenet_label"
+    source: "data/extracted/interleaved/train_lmdb_lenet_label"
     batch_size: 64
     backend: LMDB
   }
@@ -47,7 +47,7 @@ layer {
     phase: TEST
   }
   data_param {
-    source: "models/extracted_features/test_lmdb_lenet_ip1"
+    source: "data/extracted/test_lmdb_lenet_ip1"
     batch_size: 10000
     backend: LMDB
   }
@@ -60,7 +60,7 @@ layer {
     phase: TEST
   }
   data_param {
-    source: "models/extracted_features/test_lmdb_lenet_ip2"
+    source: "data/extracted/test_lmdb_lenet_ip2"
     batch_size: 10000
     backend: LMDB
   }
@@ -73,7 +73,7 @@ layer {
     phase: TEST
   }
   data_param {
-    source: "models/extracted_features/test_lmdb_lenet_label"
+    source: "data/extracted/test_lmdb_lenet_label"
     batch_size: 10000
     backend: LMDB
   }

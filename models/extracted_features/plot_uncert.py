@@ -1,3 +1,7 @@
+#!/usr/bin/python
+
+import os
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -8,10 +12,12 @@ def load_data(path):
 	
 	return np.asarray([line.strip() for line in data], dtype=np.float32)
 
-def main():
-	uncert = load_data('2_max_uncert.txt')
-	labels = load_data('label.txt')
+def main(uncert_path, labels_path):
+	uncert = load_data(uncert_path)
+	labels = load_data(labels_path)
 
+	
+	name = os.path.splitext(uncert_path)[0];
 	positive = [];
 	negative = [];
 
@@ -21,21 +27,27 @@ def main():
 		elif 1:
 			negative.append(u)
 
-	print 'positive'
-	print np.histogram(positive) 
-	print 'negative'
-	print np.histogram(negative)
+	#print 'positive'
+	#print np.histogram(positive) 
+	#print 'negative'
+	#print np.histogram(negative)
 
 	plt.hist(positive)
 	plt.title("Correctly classified")
 	plt.xlabel('Confidence')
 	plt.ylabel("Num samples")
-	plt.show()
-	
+	plt.savefig("%s_positive.png" % (name, ))
+	plt.close()
 
+	plt.hist(negative)
+	plt.title("Falsly classified")
+	plt.xlabel('Confidence')
+	plt.ylabel("Num samples")
+	plt.savefig("%s_negative.png" % (name, ))
+	plt.close()
 
 if __name__ == '__main__':
-	main()
+	main(*sys.argv[1:])
 
 
 
