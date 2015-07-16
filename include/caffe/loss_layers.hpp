@@ -799,6 +799,76 @@ protected:
     Dtype uncertainty_weight_;
 };
 
+template <typename Dtype>
+class UncertaintyLossCrossEntropyLayer : public LossLayer<Dtype> {
+public:
+    explicit UncertaintyLossCrossEntropyLayer(const LayerParameter& param);
+
+
+    virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+                         const vector<Blob<Dtype>*>& top);
+
+    virtual inline const char* type() const { return "UncertaintyLossCrossEntropy"; }
+
+    virtual inline bool AllowForceBackward(const int bottom_index) const {
+        return true;
+    }
+
+    virtual inline int ExactNumBottomBlobs() const { return 3; }
+
+protected:
+    virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+                             const vector<Blob<Dtype>*>& top);
+    virtual void Forward_gpu(const vector<Blob<Dtype>*>& bottom,
+                             const vector<Blob<Dtype>*>& top);
+
+    virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+                              const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+    virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+                              const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+
+    Dtype computeUncertaintyLoss_cpu(const vector<Blob<Dtype>*>& bottom);
+
+    Blob<Dtype> diff_;
+    Dtype uncertainty_weight_;
+};
+
+template <typename Dtype>
+class UncSigmoidCrossEntropyLossLayer : public LossLayer<Dtype> {
+ public:
+  explicit UncSigmoidCrossEntropyLossLayer(const LayerParameter& param)
+      : LossLayer<Dtype>(param),
+          sigmoid_layer_(new SigmoidLayer<Dtype>(param)),
+          sigmoid_output_(new Blob<Dtype>()) {}
+  virtual void LayerSetUp(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+  virtual void Reshape(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual inline const char* type() const { return "UncSigmoidCrossEntropyLoss";  }
+  virtual inline int ExactNumBottomBlobs() const { return 3; }
+ 
+
+ protected:
+  
+  virtual void Forward_cpu(const vector<Blob<Dtype>*>& bottom,
+      const vector<Blob<Dtype>*>& top);
+
+  virtual void Backward_cpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+  virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
+      const vector<bool>& propagate_down, const vector<Blob<Dtype>*>& bottom);
+
+  /// The internal SigmoidLayer used to map predictions to probabilities.
+  shared_ptr<SigmoidLayer<Dtype> > sigmoid_layer_;
+  /// sigmoid_output stores the output of the SigmoidLayer.
+  shared_ptr<Blob<Dtype> > sigmoid_output_;
+  /// bottom vector holder to call the underlying SigmoidLayer::Forward
+  vector<Blob<Dtype>*> sigmoid_bottom_vec_;
+  /// top vector holder to call the underlying SigmoidLayer::Forward
+  vector<Blob<Dtype>*> sigmoid_top_vec_;
+};
+
 }  // namespace caffe
 
 #endif  // CAFFE_LOSS_LAYERS_HPP_
