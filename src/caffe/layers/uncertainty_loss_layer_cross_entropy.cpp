@@ -81,14 +81,32 @@ Dtype UncertaintyLossCrossEntropyLayer<Dtype>::computeUncertaintyLoss_cpu(const 
     for(int i = 0; i < num; ++i) {
 
       Dtype correct = diff_.mutable_cpu_diff()[i];
-      Dtype u =       bottom[2]->cpu_data()[i];
-      Dtype partial_uncertainty_loss = -(correct * log(u) + (1-correct) * log(1-u));
-      Dtype weight = diff_.mutable_cpu_diff()[i] ? 1 / Dtype(num_correct) : 1 / Dtype(num_false);
-		
+      Dtype u_raw =   bottom[2]->cpu_data()[i];
+      
+//      printf( "u_raw:                  %f\n", u_raw );
+//      printf( "correct:                %f\n", correct );
+      
+      
+      Dtype partial_uncertainty_loss;
+      
+      // When abs(u_raw ) >> 400 exp(u_raw) can get infinite.
+      // Therefore use an approximation for that case.
+      if( abs(u_raw) > 400 ){
+           partial_uncertainty_loss = correct * -u_raw + (1.0-correct) * u_raw;
+      }
+      else{
+           partial_uncertainty_loss = correct * log(1.0 + exp(-u_raw)) + (1.0-correct) * log(1.0 + exp(u_raw));
+      }
+      Dtype weight = diff_.mutable_cpu_diff()[i] ? 1.0 / Dtype(num_correct) : 1.0 / Dtype(num_false);
+
+//      printf( "weight:                 %f\n", weight );
+//      printf( "partial_loss:           %f\n", partial_uncertainty_loss );
+//      printf( "log(1.0 + exp(-u_raw)): %f\n", log(1.0 + exp(-u_raw)) );
+//      printf( "log(1.0 + exp(u_raw)):  %f\n", log(1.0 + exp(u_raw)) );
+//      printf( "\n---\n\n" );
+
       // Save the derivative for backprop
-      // The real derivative has two poles at u=0 and u=1 respectively.
-      // therefore the real derivative (1-correct) / (1-u) - correct / u was altered slightly.
-      diff_.mutable_cpu_diff()[i] -= weight * ( (1-correct) / (101-u) - correct / (-100-u) ) ;
+      diff_.mutable_cpu_diff()[i] = 2.0 * weight * ( 1.0/(1.0+exp(-u_raw)) - correct ) ;
       uncertainty_loss += partial_uncertainty_loss;
 
       sum_correct += correct * bottom[2]->cpu_data()[i];
