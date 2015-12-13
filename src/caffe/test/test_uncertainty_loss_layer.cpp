@@ -22,7 +22,7 @@ class UncertaintyLossLayerTest : public MultiDeviceTest<TypeParam> {
  protected:
     UncertaintyLossLayerTest()
       : blob_bottom_data_(new Blob<Dtype>(10, 5, 1, 1)),
-        blob_bottom_label_(new Blob<Dtype>(10, 5, 1, 1)),
+        blob_bottom_label_(new Blob<Dtype>(10, 1, 1, 1)),
         blob_bottom_uncertainty_(new Blob<Dtype>(10, 1, 1, 1)),
         blob_top_loss_(new Blob<Dtype>()) {
     // fill the values
