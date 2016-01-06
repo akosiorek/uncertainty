@@ -60,22 +60,33 @@ void UncertaintyLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom
 
   Dtype uncertainty_loss = 0;
 
+  std::ofstream uncert_file("uncert.txt", std::ofstream::app);
+  std::ofstream label_file("label.txt", std::ofstream::app);
+
   //iterate over samples
   for(int i = 0; i < num; ++i) {
 
     Dtype correct = diff_.mutable_cpu_diff()[i];
     Dtype partial_uncertainty_loss = (bottom[2]->cpu_data()[i] + correct - 1);
-//    Dtype weight = diff_.mutable_cpu_diff()[i] ? 1 / Dtype(num_correct) : 1 / Dtype(num_false);
+    Dtype weight = diff_.mutable_cpu_diff()[i] ? 1 / Dtype(num_correct) : 1 / Dtype(num_false);
 
     // Save the derivative for backprop
-//    diff_.mutable_cpu_diff()[i] = weight * partial_uncertainty_loss;
-    diff_.mutable_cpu_diff()[i] = partial_uncertainty_loss;
+    diff_.mutable_cpu_diff()[i] = weight * partial_uncertainty_loss;
+//    diff_.mutable_cpu_diff()[i] = partial_uncertainty_loss;
     uncertainty_loss += diff_.mutable_cpu_diff()[i] * partial_uncertainty_loss;
+
+    if(this->phase_ == TEST) {
+      label_file << correct << std::endl;
+      uncert_file << bottom[2]->cpu_data()[i] << std::endl;
+    }
 
 
     sum_correct += correct * bottom[2]->cpu_data()[i];
     sum_false += !correct * bottom[2]->cpu_data()[i];
   }
+
+  uncert_file.close();
+  label_file.close();
 
   LOG_IF(ERROR, this->phase_ == TEST) << "correct:\tnum: " << num_correct << "\tsum: " << sum_correct << "\tmean: " << sum_correct / num_correct;
   LOG_IF(ERROR, this->phase_ == TEST) << "false:\tnum: " << num_false << "\tsum: " << sum_false << "\tmean: " << sum_false / num_false;
