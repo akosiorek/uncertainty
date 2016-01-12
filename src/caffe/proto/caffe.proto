@@ -306,7 +306,7 @@ message ParamSpec {
 // NOTE
 // Update the next available ID when you add a new LayerParameter field.
 //
-// LayerParameter next available layer-specific ID: 141 (last added: uncertainty_loss_param)
+// LayerParameter next available layer-specific ID: 142 (last added: label_expansion_param)
 message LayerParameter {
   optional string name = 1; // the layer name
   optional string type = 2; // the layer type
@@ -372,6 +372,7 @@ message LayerParameter {
   optional ImageDataParameter image_data_param = 115;
   optional InfogainLossParameter infogain_loss_param = 116;
   optional InnerProductParameter inner_product_param = 117;
+  optional LabelExpansionParameter label_expansion_param = 141;
   optional LogParameter log_param = 134;
   optional LRNParameter lrn_param = 118;
   optional MemoryDataParameter memory_data_param = 119;
@@ -737,9 +738,13 @@ message InnerProductParameter {
   optional FillerParameter bias_filler = 4; // The filler for the bias
 
   // The first axis to be lumped into a single inner product computation;
-  // all preceding axes are retained in the output.
+  // all preceding axes are retained in the output.G
   // May be negative to index from the end (e.g., -1 for the last axis).
   optional int32 axis = 5 [default = 1];
+}
+
+message LabelExpansionParameter {
+  optional uint32 num_classes = 1;
 }
 
 // Message that stores parameters used by LogLayer
