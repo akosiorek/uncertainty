@@ -6,8 +6,8 @@
 #include "caffe/util/math_functions.hpp"
 #include "caffe/layers/uncertainty_loss_layer.hpp"
 
-namespace caffe {
-
+namespace caffe
+{
 template <typename Dtype>
 UncertaintyLossLayer<Dtype>::UncertaintyLossLayer(const LayerParameter& param)
         : LossLayer<Dtype>(param), diff_() {
@@ -41,10 +41,7 @@ void UncertaintyLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom
   int num = bottom[2]->count(); // count of uncertainty outputs (or samples)
   int count = bottom[0]->count() / num; // count of groundtruth/predictions per sample
 
-  int num_correct = 0;
-  int num_false = 0;
-  Dtype sum_correct = 0;
-  Dtype sum_false = 0;
+  Dtype num_correct = 0;
   for(int i = 0; i < num; ++i, prediction_data += count) {
 
     int prediction = std::distance(prediction_data, std::max_element(prediction_data, prediction_data +  count));
@@ -56,7 +53,18 @@ void UncertaintyLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom
     diff_.mutable_cpu_diff()[i] = prediction == label;
   }
 
-  num_false = num - num_correct;
+    Dtype weight_correct = Dtype(1) / num_correct;
+    Dtype weight_false = Dtype(1) / (num - num_correct);
+
+//    Dtype total_weight = weight_correct + weight_false;
+//    weight_correct /= total_weight;
+//    weight_false /= total_weight;
+
+  Dtype normalizer = Dtype(num * num) / 2 / num_correct / (num - num_correct);
+  weight_correct *= normalizer;
+  weight_false *= normalizer;
+
+//  LOG(ERROR) << "weight correct = " << weight_correct << "\tweight false = " << weight_false;
 
   Dtype uncertainty_loss = 0;
 
@@ -68,7 +76,7 @@ void UncertaintyLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom
 
     Dtype correct = diff_.mutable_cpu_diff()[i];
     Dtype partial_uncertainty_loss = (bottom[2]->cpu_data()[i] + correct - 1);
-    Dtype weight = diff_.mutable_cpu_diff()[i] ? 1 / Dtype(num_correct) : 1 / Dtype(num_false);
+    Dtype weight = diff_.mutable_cpu_diff()[i] ? weight_correct : weight_false;
 
     // Save the derivative for backprop
     diff_.mutable_cpu_diff()[i] = weight * partial_uncertainty_loss;
@@ -79,17 +87,11 @@ void UncertaintyLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtype>*>& bottom
       label_file << correct << std::endl;
       uncert_file << bottom[2]->cpu_data()[i] << std::endl;
     }
-
-
-    sum_correct += correct * bottom[2]->cpu_data()[i];
-    sum_false += !correct * bottom[2]->cpu_data()[i];
   }
 
   uncert_file.close();
   label_file.close();
 
-  LOG_IF(ERROR, this->phase_ == TEST) << "correct:\tnum: " << num_correct << "\tsum: " << sum_correct << "\tmean: " << sum_correct / num_correct;
-  LOG_IF(ERROR, this->phase_ == TEST) << "false:\tnum: " << num_false << "\tsum: " << sum_false << "\tmean: " << sum_false / num_false;
 
   // average over samples, weight and divide by 2
   top[0]->mutable_cpu_data()[0] = uncertainty_loss * uncertainty_weight_ / Dtype(2) / num;
