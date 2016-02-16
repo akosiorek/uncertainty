@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-#
-# Sums up text files with different names from several folders to 
-# compute averaged plots
-#
+"""
+Sums up text files with different names from several folders to
+compute averaged plots
+"""
 import sys
 import os
 from visualize import filter_and_sort
