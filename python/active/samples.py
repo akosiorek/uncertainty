@@ -3,6 +3,7 @@ import numpy as np
 import caffe
 import lmdb
 
+import utils
 
 def entry_shape(db_path):
 
@@ -45,19 +46,22 @@ def move_cursor_circular(cursor):
         cursor.first()
 
 
-def build_batch(cursor, batch_size, input_shape, first_key, skip_keys=None):
+def build_batch(cursor, batch_size, input_shape, skip_keys=None):
 
     X = np.zeros([batch_size] + list(input_shape), dtype=np.float32)
     y = np.zeros(batch_size, dtype=np.int32)
     keys = np.zeros(batch_size, dtype=np.object)
 
+    first_key = None
     index = 0
     while index < batch_size:
         key, raw_datum = cursor.item()
         move_cursor_circular(cursor)
 
         # check if we've seen this key already
-        if first_key is not None and first_key == key:
+        if first_key is None:
+            first_key = key
+        elif first_key == key:
             return None
 
         if skip_keys is not None:
@@ -75,7 +79,10 @@ def build_batch(cursor, batch_size, input_shape, first_key, skip_keys=None):
     return X, y, keys
 
 
-def choose_active(model_file, pretrained_net, mean_file, db, batch_size, criterium, num_batches_to_choose, input_shape, skip_keys=set()):
+sample_mean = None
+
+
+def choose_active(model_file, pretrained_net, mean_file, db, batch_size, criterium, num_batches_to_choose, total_num_batches, input_shape, skip_keys=set()):
     print 'Choosing active samples....'
 
     num_to_choose = num_batches_to_choose * batch_size
@@ -83,25 +90,24 @@ def choose_active(model_file, pretrained_net, mean_file, db, batch_size, criteri
     net = caffe.Net(model_file, pretrained_net, caffe.TEST)
     env = lmdb.open(db, readonly=True)
 
-    mean = read_meanfile(mean_file)
-    batch_num = 0
+    global sample_mean
+    if sample_mean is None:
+        sample_mean = read_meanfile(mean_file)
+
     with env.begin() as txn:
         cursor = txn.cursor()
         cursor.first()
         key, _ = cursor.item()
-        first_key = None
 
-        while len(chosen_keys) < num_to_choose:
-
-            batch = build_batch(cursor, batch_size, input_shape, skip_keys, first_key)
-            if first_key is None:
-                first_key = key
+        for batch_num in xrange(total_num_batches):
+            batch = build_batch(cursor, batch_size, input_shape, skip_keys)
 
             if batch is None:
+                print 'Couldn\'t choose a batch'
                 break
 
             X, y, keys = batch
-            X -= mean
+            X -= sample_mean
 
             net.forward(data=X)
             y_predicted = net.blobs["ip2"].data.argmax(axis=1)
@@ -115,19 +121,25 @@ def choose_active(model_file, pretrained_net, mean_file, db, batch_size, criteri
 
             chosen_keys.extend(keys_to_add)
             skip_keys.update(keys_to_add)
-            print 'Batch number={2}, Chosen {0}/{1} keys'.format(len(chosen_keys), num_to_choose, batch_num)
-            batch_num += 1
 
+            utils.wait_bar('Batch number={0}, Chosen'.format(batch_num), 'keys', len(chosen_keys), num_to_choose)
+            if len(chosen_keys) == num_to_choose:
+                break
+
+    print
     env.close()
 
     num_to_return = (len(chosen_keys) / batch_size) * batch_size
     save_for_later = chosen_keys[num_to_return:]
+    print len(skip_keys)
     skip_keys.difference_update(save_for_later)
+    print len(skip_keys)
+    print len(set(chosen_keys))
     chosen_keys = chosen_keys[:num_to_return]
 
-    print 'Used {0} samples'.format(len(skip_keys))
-    print max(skip_keys)
-    assert len(skip_keys) < int(max(skip_keys))
+    print 'Used {0} samples. Max used sample = {1}'.format(len(skip_keys), max(skip_keys))
+    print 'Returning {0} new samples'.format(len(chosen_keys))
+    assert len(skip_keys) <= int(max(skip_keys)), 'Indext of the highest sample is lower than the number of used samples'
     return chosen_keys
 
 
