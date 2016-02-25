@@ -26,6 +26,7 @@ To do that we need:
 
 import random
 import os
+import sys
 import shutil
 import numpy as np
 import subprocess
@@ -148,9 +149,8 @@ if __name__ == '__main__':
             solverstate_path = '{0}_iter_{1}.solverstate.h5'.format(snapshot_prefix, snapshot_iter)
             caffemodel_path = '{0}_iter_{1}.caffemodel.h5'.format(snapshot_prefix, snapshot_iter)
             active_samples = samples.choose_active(
-                    deploy_net_path,
-                    caffemodel_path, mean_file, train_db_path,
-                    batch_size, criterium, BATCHES_PER_RUN, train_db_len/batch_size, input_shape, used_samples
+                    deploy_net_path, caffemodel_path, mean_file, train_db_path,
+                    batch_size, BATCHES_PER_RUN, train_db_len/batch_size, input_shape, used_samples, criterium
             )
 
             iters_to_do = min(len(active_samples) / batch_size, BATCHES_PER_RUN)

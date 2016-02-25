@@ -30,7 +30,7 @@ def evaluate(model_file, pretrained_net, mean_file, db, batch_size):
         cursor.first()
 
         for index in xrange(num_batches):
-            print 'Evaluating batch {0}/{1}....\r'.format(index+1, num_batches),
+            print 'Evaluating batch {0}/{1}...\r'.format(index+1, num_batches),
             sys.stdout.flush()
 
             # print 'Running batch #{0}'.format(index)

@@ -1,4 +1,5 @@
 
+import math
 import numpy as np
 import caffe
 import lmdb
@@ -82,10 +83,15 @@ def build_batch(cursor, batch_size, input_shape, skip_keys=None):
 sample_mean = None
 
 
-def choose_active(model_file, pretrained_net, mean_file, db, batch_size, criterium, num_batches_to_choose, total_num_batches, input_shape, skip_keys=set()):
+def choose_active(model_file, pretrained_net, mean_file, db, batch_size, num_batches_to_choose, total_num_batches,
+                  input_shape, skip_keys=set(), criterium=None):
+
     print 'Choosing active samples....'
 
-    num_to_choose = num_batches_to_choose * batch_size
+    total_num_samples = total_num_batches * batch_size - len(skip_keys)
+    total_num_batches = int(math.ceil(float(total_num_samples) / batch_size))
+
+    num_to_choose = min(num_batches_to_choose, total_num_batches) * batch_size
     chosen_keys = []
     net = caffe.Net(model_file, pretrained_net, caffe.TEST)
     env = lmdb.open(db, readonly=True)
