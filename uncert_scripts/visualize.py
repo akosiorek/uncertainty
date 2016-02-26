@@ -5,6 +5,7 @@ Assumes appropriate folder structure and correctnes and labels in separate files
 """
 import os
 import sys
+import re
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -42,7 +43,9 @@ if __name__ == '__main__':
     mean_acc = []
     uncertss = []
 
+    x = []
     for (label_file, uncert_file) in zip(label_files, uncert_files):
+        x.append(int(re.search(r'_(\d+)', label_file).groups()[0]))
         labels = read_file(os.path.join(folder, label_file))
         uncerts = read_file(os.path.join(folder, uncert_file))
 
@@ -52,8 +55,6 @@ if __name__ == '__main__':
         mean_uncert_pos.append(uncerts[labels > 0].mean())
         mean_uncert_neg.append(uncerts[labels == 0].mean())
         mean_acc.append(labels.mean())
-
-    x = range(100, max_num + 1, 100)
 
     plt.figure()
     plt.plot(x, mean_acc, 'g', label='accuracy', linewidth=2)
@@ -77,3 +78,9 @@ if __name__ == '__main__':
     plt.ylabel('Uncertainty')
     plt.xlabel('Number of training iterations')
     plt.savefig('sample_uncert_evolution.png')
+
+
+    scores = zip(x, mean_uncert)
+    scores = sorted(scores, key=lambda x:x[0])
+    for s in scores:
+      print s
