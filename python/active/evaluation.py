@@ -45,10 +45,8 @@ class NetEvaluation(object):
         else:
             self.snapshots = ((utils.get_snapshot_number(self.snapshot_path), self.snapshot_path),)
 
-        if os.path.exists(self.results_folder):
-            shutil.rmtree(self.results_folder)
-        os.mkdir(self.results_folder)
-
+        self.prepare_output_folder()
+        self.init_output_storage()
         self.initialized = True
 
     def evaluate(self):
@@ -58,44 +56,50 @@ class NetEvaluation(object):
         for snapshot_num, snapshot_path in self.snapshots:
             print 'Processing snapshot #{0}'.format(snapshot_num)
             # output = evaluate(self.deploy_net_path, snapshot_path, self.mean, self.db_path, self.batch_size)
-            output = self.compute(snapshot_path)
-            self.process_output(snapshot_num, output)
-
-    def process_output(self, snapshot_num, output):
-        uncert, correct = output
-        uncert_path = os.path.join(results_folder, 'uncert_{0}.txt'.format(snapshot_num))
-        label_path = os.path.join(results_folder, 'label_{0}.txt'.format(snapshot_num))
-
-        utils.write_to_file(uncert_path, uncert)
-        utils.write_to_file(label_path, correct)
+            self.compute(snapshot_path)
+            self.process_output(snapshot_num)
 
     def compute(self, snapshot_path):
-        uncertainty = np.zeros(self.db_size, dtype=np.float32)
-        correct = np.zeros(self.db_size, dtype=np.int8)
-
         net = caffe.Net(self.deploy_net_path, snapshot_path, caffe.TEST)
         env = lmdb.open(self.db_path, readonly=True)
 
         with env.begin() as txn:
             cursor = txn.cursor()
             cursor.first()
-            beg, end = 0, self.batch_size
 
-            for index in xrange(self.num_batches):
-                utils.wait_bar('Evaluating batch ', '...', index+1, self.num_batches)
+            for itr in xrange(self.num_batches):
+                utils.wait_bar('Evaluating batch ', '...', itr+1, self.num_batches)
 
                 X, y, keys = samples.build_batch(cursor, self.batch_size, self.input_shape)
                 X -= self.mean
 
                 net.forward(data=X)
-                y_predicted = net.blobs["ip2"].data.argmax(axis=1)
-                uncertainty[beg:end] = utils.entropy(utils.softmax(net.blobs["ip2"].data))
-                correct[beg:end] = np.equal(y, y_predicted)
-                beg += self.batch_size
-                end += self.batch_size
-
+                self.process_intermediate_output(itr, X, y, net)
         print
-        return uncertainty, correct
+
+    def prepare_output_folder(self):
+        if os.path.exists(self.results_folder):
+            shutil.rmtree(self.results_folder)
+        os.mkdir(self.results_folder)
+
+    def init_output_storage(self):
+        self.uncertainty = np.zeros(self.db_size, dtype=np.float32)
+        self.correct = np.zeros(self.db_size, dtype=np.int8)
+
+    def process_intermediate_output(self, itr, X, y, net):
+        beg = itr * self.batch_size
+        end = beg + self.batch_size
+
+        y_predicted = net.blobs["ip2"].data.argmax(axis=1)
+        self.uncertainty[beg:end] = utils.entropy(utils.softmax(net.blobs["ip2"].data))
+        self.correct[beg:end] = np.equal(y, y_predicted)
+
+    def process_output(self, snapshot_num):
+        uncert_path = os.path.join(self.results_folder, 'uncert_{0}.txt'.format(snapshot_num))
+        label_path = os.path.join(self.results_folder, 'label_{0}.txt'.format(snapshot_num))
+
+        utils.write_to_file(uncert_path, self.uncertainty)
+        utils.write_to_file(label_path, self.correct)
 
 
 if __name__ == '__main__':

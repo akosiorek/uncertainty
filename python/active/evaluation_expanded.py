@@ -1,107 +1,74 @@
 #!/usr/bin/env python
 
+import numpy as np
 import os
 import sys
-import shutil
-import numpy as np
-
-import lmdb
 
 os.environ['GLOG_minloglevel'] = '1'
 import caffe
 
-import active_learning
 import utils
-import samples
-import proto
+from evaluation import NetEvaluation
 
 UNCERTS = ['max_unc', 'entropy_conf', 'entropy_ip2', '2_max_ip2', 'entropy_weighted', '2_max_weighted']
 NUM_UNC = len(UNCERTS)
 
 
-def evaluate(model_file, pretrained_net, db, batch_size, mean):
+class EvaluationExpanded(NetEvaluation):
 
-    input_shape = samples.entry_shape(db)
-    size = samples.len_db(db)
-    num_batches = size / batch_size
+    def __init__(self, net_path, db_path, snapshot_path, results_folder, every_iter=None):
+        super(EvaluationExpanded, self).__init__(net_path, db_path, snapshot_path, results_folder, every_iter)
+        self.output_folders = [os.path.join(results_folder, output_name) for output_name in UNCERTS]
 
-    uncertainty = np.zeros((size, NUM_UNC), dtype=np.float32)
-    correct = np.zeros(size, dtype=np.int8)
+    def prepare_output_folder(self):
+        super(EvaluationExpanded, self).prepare_output_folder()
+        for output_folder in self.output_folders:
+            os.mkdir(output_folder)
 
-    net = caffe.Net(model_file, pretrained_net, caffe.TEST)
-    env = lmdb.open(db, readonly=True)
+    def init_output_storage(self):
+        self.uncertainty = np.zeros((self.db_size, NUM_UNC), dtype=np.float32)
+        self.correct = np.zeros(self.db_size, dtype=np.int8)
 
-    print 'Processing {0}'.format(pretrained_net)
-    with env.begin() as txn:
-        cursor = txn.cursor()
-        cursor.first()
+    def process_intermediate_output(self, itr, X, y, net):
+        beg = itr * self.batch_size
+        end = beg + self.batch_size
 
-        for index in xrange(num_batches):
-            print 'Evaluating batch {0}/{1}...\r'.format(index+1, num_batches),
-            sys.stdout.flush()
+        weighted = utils.softmax(net.blobs["weighted_input"].data)
+        ip2 = utils.softmax(net.blobs["ip2"].data)
+        confidence = net.blobs["confidence"].data
 
-            # print 'Running batch #{0}'.format(index)
-            beg = index * batch_size
-            end = (index+1) * batch_size
+        y_predicted = weighted.argmax(axis=1)
 
-            X, y, keys = samples.build_batch(cursor, batch_size, input_shape)
-            X -= mean
+        self.uncertainty[beg:end, 0] = 1-confidence[xrange(y_predicted.shape[0]), y_predicted]
+        self.uncertainty[beg:end, 1] = utils.entropy(confidence)
+        self.uncertainty[beg:end, 2] = utils.entropy(ip2)
+        self.uncertainty[beg:end, 3] = utils.second_max(ip2)
+        self.uncertainty[beg:end, 4] = utils.entropy(weighted)
+        self.uncertainty[beg:end, 5] = utils.second_max(weighted)
 
-            net.forward(data=X)
+        self.correct[beg:end] = np.equal(y, y_predicted)
 
-            weighted = utils.softmax(net.blobs["weighted_input"].data)
-            ip2 = utils.softmax(net.blobs["ip2"].data)
-            confidence = net.blobs["confidence"].data
+    def process_output(self, snapshot_num):
+        for output_num, outut_folder in enumerate(self.output_folders):
+            uncert_path = os.path.join(outut_folder, 'uncert_{0}.txt'.format(snapshot_num))
+            label_path = os.path.join(outut_folder, 'label_{0}.txt'.format(snapshot_num))
 
-            y_predicted = weighted.argmax(axis=1)
-
-            uncertainty[beg:end, 0] = 1-confidence[xrange(y_predicted.shape[0]), y_predicted]
-            uncertainty[beg:end, 1] = utils.entropy(confidence)
-            uncertainty[beg:end, 2] = utils.entropy(ip2)
-            uncertainty[beg:end, 3] = utils.second_max(ip2)
-            uncertainty[beg:end, 4] = utils.entropy(weighted)
-            uncertainty[beg:end, 5] = utils.second_max(weighted)
-
-            correct[beg:end] = np.equal(y, y_predicted)
-
-    print
-    return uncertainty, correct
-
+            utils.write_to_file(uncert_path, self.uncertainty[:, output_num])
+            utils.write_to_file(label_path, self.correct)
 
 if __name__ == '__main__':
     args = sys.argv[1:]
 
-    net_path, db_path, snapshot_folder, results_folder = args
+    net_path = args[0]
+    db_path = args[1]
+    snapshot_folder = args[2]
+    results_folder = args[3]
 
-    batch_size, mean_file = proto.get_batch_mean_from_net(net_path)
-    input_shape = samples.entry_shape(db_path)
-    deploy_net_path = net_path + '.deploy' + active_learning.POSTFIX
-    proto.prepare_deploy_net(net_path, deploy_net_path, batch_size, input_shape)
+    if len(args) > 4:
+        every_iter = int(args[4])
+    else:
+        every_iter = None
 
     caffe.set_mode_gpu()
-    mean = samples.read_meanfile(mean_file)
-
-    files = utils.get_snapshot_files(snapshot_folder)
-
-    if os.path.exists(results_folder):
-        shutil.rmtree(results_folder)
-
-    output_folders = [os.path.join(results_folder, output_name) for output_name in UNCERTS]
-
-    os.mkdir(results_folder)
-    for output_folder in output_folders:
-        os.mkdir(output_folder)
-
-    for snapshot_num, pretrained in files:
-        print 'Processing {0}'.format(pretrained)
-        pretrained = os.path.join(snapshot_folder, pretrained)
-        num = utils.get_snapshot_number(pretrained)
-        uncert, correct = evaluate(deploy_net_path, pretrained, db_path, batch_size, mean)
-
-        for output_num, outut_folder in enumerate(output_folders):
-
-            uncert_path = os.path.join(outut_folder, 'uncert_{0}.txt'.format(num))
-            label_path = os.path.join(outut_folder, 'label_{0}.txt'.format(num))
-
-            utils.write_to_file(uncert_path, uncert[:, output_num])
-            utils.write_to_file(label_path, correct)
+    evaluation = EvaluationExpanded(net_path, db_path, snapshot_folder, results_folder, every_iter)
+    evaluation.evaluate()
