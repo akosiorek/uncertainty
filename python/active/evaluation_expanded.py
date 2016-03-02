@@ -1,8 +1,19 @@
 #!/usr/bin/env python
 
-from active_learning import *
-from utils import *
+import os
+import sys
+import shutil
+import numpy as np
 
+import lmdb
+
+os.environ['GLOG_minloglevel'] = '1'
+import caffe
+
+import active_learning
+import utils
+import samples
+import proto
 
 UNCERTS = ['max_unc', 'entropy_conf', 'entropy_ip2', '2_max_ip2', 'entropy_weighted', '2_max_weighted']
 NUM_UNC = len(UNCERTS)
@@ -38,18 +49,18 @@ def evaluate(model_file, pretrained_net, db, batch_size, mean):
 
             net.forward(data=X)
 
-            weighted = softmax(net.blobs["weighted_input"].data)
-            ip2 = softmax(net.blobs["ip2"].data)
+            weighted = utils.softmax(net.blobs["weighted_input"].data)
+            ip2 = utils.softmax(net.blobs["ip2"].data)
             confidence = net.blobs["confidence"].data
 
             y_predicted = weighted.argmax(axis=1)
 
             uncertainty[beg:end, 0] = 1-confidence[xrange(y_predicted.shape[0]), y_predicted]
-            uncertainty[beg:end, 1] = entropy(confidence)
-            uncertainty[beg:end, 2] = entropy(ip2)
-            uncertainty[beg:end, 3] = second_max(ip2)
-            uncertainty[beg:end, 4] = entropy(weighted)
-            uncertainty[beg:end, 5] = second_max(weighted)
+            uncertainty[beg:end, 1] = utils.entropy(confidence)
+            uncertainty[beg:end, 2] = utils.entropy(ip2)
+            uncertainty[beg:end, 3] = utils.second_max(ip2)
+            uncertainty[beg:end, 4] = utils.entropy(weighted)
+            uncertainty[beg:end, 5] = utils.second_max(weighted)
 
             correct[beg:end] = np.equal(y, y_predicted)
 
@@ -62,15 +73,15 @@ if __name__ == '__main__':
 
     net_path, db_path, snapshot_folder, results_folder = args
 
-    batch_size, mean_file = get_batch_mean_from_net(net_path)
+    batch_size, mean_file = proto.get_batch_mean_from_net(net_path)
     input_shape = samples.entry_shape(db_path)
-    deploy_net_path = net_path + '.deploy' + POSTFIX
-    prepare_deploy_net(net_path, deploy_net_path, batch_size, input_shape)
+    deploy_net_path = net_path + '.deploy' + active_learning.POSTFIX
+    proto.prepare_deploy_net(net_path, deploy_net_path, batch_size, input_shape)
 
     caffe.set_mode_gpu()
     mean = samples.read_meanfile(mean_file)
 
-    files = get_snapshot_files(snapshot_folder)
+    files = utils.get_snapshot_files(snapshot_folder)
 
     if os.path.exists(results_folder):
         shutil.rmtree(results_folder)
@@ -84,7 +95,7 @@ if __name__ == '__main__':
     for snapshot_num, pretrained in files:
         print 'Processing {0}'.format(pretrained)
         pretrained = os.path.join(snapshot_folder, pretrained)
-        num = get_snapshot_number(pretrained)
+        num = utils.get_snapshot_number(pretrained)
         uncert, correct = evaluate(deploy_net_path, pretrained, db_path, batch_size, mean)
 
         for output_num, outut_folder in enumerate(output_folders):
@@ -92,5 +103,5 @@ if __name__ == '__main__':
             uncert_path = os.path.join(outut_folder, 'uncert_{0}.txt'.format(num))
             label_path = os.path.join(outut_folder, 'label_{0}.txt'.format(num))
 
-            write_to_file(uncert_path, uncert[:, output_num])
-            write_to_file(label_path, correct)
+            utils.write_to_file(uncert_path, uncert[:, output_num])
+            utils.write_to_file(label_path, correct)
