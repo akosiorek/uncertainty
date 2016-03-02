@@ -6,6 +6,7 @@ import lmdb
 
 import utils
 
+
 def entry_shape(db_path):
 
     env = lmdb.open(db_path, readonly=True)
@@ -90,11 +91,15 @@ def choose_active(model_file, pretrained_net, mean_file, db, batch_size, num_bat
 
     total_num_samples = total_num_batches * batch_size - len(skip_keys)
     total_num_batches = int(math.ceil(float(total_num_samples) / batch_size))
+    total_num_samples = total_num_batches * batch_size
 
-    num_to_choose = min(num_batches_to_choose, total_num_batches) * batch_size
-    chosen_keys = []
+    num_batches_to_choose = min(num_batches_to_choose, total_num_batches)
     net = caffe.Net(model_file, pretrained_net, caffe.TEST)
     env = lmdb.open(db, readonly=True)
+
+    uncert = np.zeros(total_num_samples, dtype=np.float32)
+    correct = np.zeros(total_num_samples, dtype=bool)
+    keys = np.zeros(total_num_samples, dtype=np.object)
 
     global sample_mean
     if sample_mean is None:
@@ -106,42 +111,39 @@ def choose_active(model_file, pretrained_net, mean_file, db, batch_size, num_bat
         key, _ = cursor.item()
 
         for batch_num in xrange(total_num_batches):
+            utils.wait_bar('Batch number', '', batch_num+1, total_num_batches)
+            beg = batch_num * batch_size
+            end = beg + batch_size
+
             batch = build_batch(cursor, batch_size, input_shape, skip_keys)
 
             if batch is None:
+                uncert = uncert[:beg]
+                correct = correct[:beg]
+                keys = keys[:beg]
                 print 'Couldn\'t choose a batch'
                 break
 
-            X, y, keys = batch
+            X, y, batch_keys = batch
             X -= sample_mean
 
             net.forward(data=X)
             y_predicted = net.blobs["ip2"].data.argmax(axis=1)
-            uncertainty = net.blobs["uncertainty"].data.squeeze()
-            correct = np.equal(y, y_predicted)
+            # uncert[beg:end] = net.blobs["uncertainty"].data.squeeze()
+            uncert[beg:end] = utils.entropy(utils.softmax(net.blobs["ip2"].data))
+            correct[beg:end] = np.equal(y, y_predicted)
+            keys[beg:end] = batch_keys
 
-            keys_to_add = criterium(uncertainty, correct, keys)
-            num_to_add = min(len(keys_to_add), num_to_choose-len(chosen_keys))
-
-            keys_to_add = keys_to_add[:num_to_add]
-
-            chosen_keys.extend(keys_to_add)
-            skip_keys.update(keys_to_add)
-
-            utils.wait_bar('Batch number={0}, Chosen'.format(batch_num), 'keys', len(chosen_keys), num_to_choose)
-            if len(chosen_keys) == num_to_choose:
-                break
-
-    print
     env.close()
+    print
+    print 'Accuracy = {0}, mean uncertainty = {1}'.format(correct.mean(), uncert.mean())
 
-    num_to_return = (len(chosen_keys) / batch_size) * batch_size
-    save_for_later = chosen_keys[num_to_return:]
-    print len(skip_keys)
-    skip_keys.difference_update(save_for_later)
-    print len(skip_keys)
-    print len(set(chosen_keys))
+    chosen_keys = criterium(uncert, correct, keys)
+
+    num_to_return = min((len(chosen_keys) / batch_size), num_batches_to_choose) * batch_size
     chosen_keys = chosen_keys[:num_to_return]
+    skip_keys.update(chosen_keys)
+
 
     print 'Used {0} samples. Max used sample = {1}'.format(len(skip_keys), max(skip_keys))
     print 'Returning {0} new samples'.format(len(chosen_keys))

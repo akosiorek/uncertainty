@@ -69,8 +69,7 @@ if __name__ == '__main__':
 
     uncertss = zip(*uncertss)
     plt.figure()
-    for i in xrange(50, 60):
-        print len(uncertss[i]), np.mean(uncertss[i])
+    for i in xrange(50, 55):
         plt.plot(x, uncertss[i], linewidth=2, label=str(np.mean(uncertss[i])))
 
     plt.legend(loc='best')
@@ -79,8 +78,7 @@ if __name__ == '__main__':
     plt.xlabel('Number of training iterations')
     plt.savefig('sample_uncert_evolution.png')
 
-
     scores = zip(x, mean_uncert)
     scores = sorted(scores, key=lambda x:x[0])
     for s in scores:
-      print s
+        print 'iter = {:06}, uncertainty = {}'.format(*s)

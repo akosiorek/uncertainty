@@ -3,6 +3,8 @@ from google.protobuf import text_format
 import caffe
 from caffe.proto.caffe_pb2 import SolverParameter, NetParameter, BlobShape
 
+ITER_TO_INIT = 1000
+
 
 def load_proto(path, proto_type):
     proto = proto_type()
@@ -49,7 +51,7 @@ def prepare_solver(solver_path, out_path, prepared_net):
 
     proto.snapshot = 0
     proto.snapshot_after_train = True
-    proto.max_iter = 2000
+    proto.max_iter = ITER_TO_INIT
     proto.net = prepared_net
     proto.test_initialization = False
 
