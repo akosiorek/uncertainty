@@ -31,8 +31,8 @@ class NetEvaluation(object):
 
         print 'Initializing...'
 
-        self.batch_size, mean_path = proto.get_batch_mean_from_net(net_path)
-        self.input_shape = samples.entry_shape(db_path)
+        self.batch_size, mean_path = proto.get_batch_mean_from_net(self.net_path)
+        self.input_shape = samples.entry_shape(self.db_path)
         self.db_size = samples.len_db(self.db_path)
         self.num_batches = self.db_size / self.batch_size
         self.deploy_net_path = os.path.join('/tmp', os.path.basename(self.net_path) + '.deploy' + active_learning.POSTFIX)

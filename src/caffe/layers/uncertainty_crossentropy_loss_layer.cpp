@@ -28,6 +28,16 @@ void UncertaintyCrossentropyLossLayer<Dtype>::Reshape(
   diff_.ReshapeLike(*bottom[0]);
 }
 
+template<typename T>
+void write_to_file(const T* data, size_t size, const std::string& filename) {
+
+  std::ofstream file(filename, std::ofstream::app);
+  for(int i = 0; i < size; ++i) {
+    file << data[i] << std::endl;
+  }
+  file.close();
+}
+
 
 // computes MSE uncertainty loss. There's one output per sample (e.g. 30 outputs
 // when the minibatch size=30)
@@ -44,8 +54,8 @@ void UncertaintyCrossentropyLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtyp
   Dtype num_correct = 0;
   for(int i = 0; i < num; ++i, prediction_data += count) {
 
-    int prediction = std::distance(prediction_data, std::max_element(prediction_data, prediction_data +  count));
-    int label = groundtruth_data[i];
+    auto prediction = std::distance(prediction_data, std::max_element(prediction_data, prediction_data +  count));
+    auto label = groundtruth_data[i];
 
     num_correct += prediction == label;
 
@@ -53,35 +63,19 @@ void UncertaintyCrossentropyLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtyp
     diff_.mutable_cpu_diff()[i] = prediction == label;
   }
 
-////  Dtype weight_correct = (num_correct + 1) / (num + 2);
-////  Dtype weight_false = (num - num_correct + 1) / (num + 2);
-//
-//  Dtype weight_correct = Dtype(1) / num_correct;
-//  Dtype weight_false = Dtype(1) / (num - num_correct);
-//
-////    Dtype total_weight = weight_correct + weight_false;
-////    weight_correct /= total_weight;
-////    weight_false /= total_weight;
-//
-//  Dtype normalizer = Dtype(num * num) / 2 / num_correct / (num - num_correct);
-//  weight_correct *= normalizer;
-//  weight_false *= normalizer;
+//  Dtype weight_correct = 1;
+//  Dtype weight_false = 1;
 
-//    Dtype weight_correct = Dtype(num) / num_correct / 2;
-//  Dtype weight_false = Dtype(num) / (num - num_correct) / 2;
+  Dtype weight_correct = 2 * (num - num_correct) / num;
+  Dtype weight_false = 2 - weight_correct;
 
-  Dtype weight_correct = 1;
-  Dtype weight_false = 1;
-
-//  LOG(ERROR) << "weight correct = " << weight_correct << "\tweight false = " << weight_false;
-
-
-
-  std::ofstream uncert_file("uncert.txt", std::ofstream::app);
-  std::ofstream label_file("label.txt", std::ofstream::app);
+  //  hack for testing
+  if(this->phase_ == TEST) {
+    write_to_file(diff_.mutable_cpu_diff(), num, "label.txt");
+    write_to_file(bottom[2]->cpu_data(), num, "uncert.txt");
+  }
 
   Dtype uncertainty_loss = 0;
-  prediction_data =  bottom[0]->cpu_data();
   //iterate over samples
   for(int i = 0; i < num; ++i) {
 
@@ -92,22 +86,14 @@ void UncertaintyCrossentropyLossLayer<Dtype>::Forward_cpu(const vector<Blob<Dtyp
     Dtype eps = 1e-6;
     uncertainty += (- (uncertainty > (1 - eps)) + (uncertainty < eps)) * (eps);
 
-    uncertainty_loss -= log(uncertainty) * (correct * weight_correct + (1 - correct) * weight_false);
+    uncertainty_loss -= log(uncertainty);// * (correct * weight_correct + (1 - correct) * weight_false);
 
     // Save the derivative for backprop
 //    diff_.mutable_cpu_diff()[i] = (1 / uncertainty - (1 - correct) * 2 / uncertainty);
     diff_.mutable_cpu_diff()[i] = (1 / uncertainty * weight_correct - (1 - correct) / uncertainty * (weight_correct + weight_false));
-
-    if(this->phase_ == TEST) {
-      label_file << correct << std::endl;
-      uncert_file << uncertainty << std::endl;
-    }
   }
 
-  uncert_file.close();
-  label_file.close();
-
-  // average over samples, weight and divide by 2
+  // average over samples and weigh
   top[0]->mutable_cpu_data()[0] = uncertainty_loss * uncertainty_weight_ / num;
 }
 
