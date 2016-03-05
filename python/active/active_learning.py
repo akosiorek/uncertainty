@@ -28,6 +28,7 @@ import utils
 CAFFE_EXEC = '../build/tools/caffe'
 MODEL_FOLDER = 'models/uncertainty'
 POSTFIX = '.active'
+EPOCH_FILE = 'epochs.txt'
 
 MAX_EPOCHS = 10
 BATCHES_PER_RUN = 100
@@ -147,6 +148,10 @@ if __name__ == '__main__':
             proto.increase_max_iters(active_solver_path, iters_to_do)
             train_network(active_solver_path, solverstate_path)
             snapshot_iter += iters_to_do
+
+        with open(EPOCH_FILE, 'a') as f:
+            f.write(str(snapshot_iter))
+            f.write('\n')
 
 
 
