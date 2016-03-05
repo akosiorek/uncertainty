@@ -1,10 +1,14 @@
-
 import math
 import numpy as np
 import caffe
 import lmdb
 
 import utils
+
+
+DROPOUT_ITERS = 10
+OUTPUT_LAYER = 'ip2'
+SAMPLE_MEAN = None
 
 
 def entry_shape(db_path):
@@ -81,7 +85,38 @@ def build_batch(cursor, batch_size, input_shape, skip_keys=None):
     return X, y, keys
 
 
-sample_mean = None
+def uncertainty_dropout_argmax(X, y, net):
+    probs = np.zeros(net.blobs[OUTPUT_LAYER].data.shape, dtype=np.float32)
+    lin_index = range(probs.shape[0])
+    for _ in xrange(DROPOUT_ITERS):
+        net.forward(data=X)
+        argmax = net.blobs[OUTPUT_LAYER].data.argmax(axis=1)
+        probs[lin_index, argmax] += 1
+    probs /= DROPOUT_ITERS
+
+    uncert = utils.entropy(probs)
+    correct = np.equal(y, probs.argmax(axis=1))
+    return uncert, correct
+
+
+def uncertainty_dropout_sum(X, y, net):
+    probs = np.zeros(net.blobs[OUTPUT_LAYER].data.shape, dtype=np.float32)
+    for _ in xrange(DROPOUT_ITERS):
+        net.forward(data=X)
+        probs += utils.softmax(net.blobs[OUTPUT_LAYER].data)
+    probs /= DROPOUT_ITERS
+
+    uncert = utils.entropy(probs)
+    correct = np.equal(y, probs.argmax(axis=1))
+    return uncert, correct
+
+
+def uncertainty_base_case(X, y, net):
+    net.forward(data=X)
+    y_predicted = net.blobs[OUTPUT_LAYER].data.argmax(axis=1)
+    uncert = utils.entropy(utils.softmax(net.blobs[OUTPUT_LAYER].data))
+    correct = np.equal(y, y_predicted)
+    return uncert, correct
 
 
 def choose_active(model_file, pretrained_net, mean_file, db, batch_size, num_batches_to_choose, total_num_batches,
@@ -101,17 +136,16 @@ def choose_active(model_file, pretrained_net, mean_file, db, batch_size, num_bat
     correct = np.zeros(total_num_samples, dtype=bool)
     keys = np.zeros(total_num_samples, dtype=np.object)
 
-    global sample_mean
-    if sample_mean is None:
-        sample_mean = read_meanfile(mean_file)
+    global SAMPLE_MEAN
+    if SAMPLE_MEAN is None:
+        SAMPLE_MEAN = read_meanfile(mean_file)
 
     with env.begin() as txn:
         cursor = txn.cursor()
         cursor.first()
-        key, _ = cursor.item()
 
         for batch_num in xrange(total_num_batches):
-            utils.wait_bar('Batch number', '', batch_num+1, total_num_batches)
+            utils.wait_bar('Batch number', '', batch_num + 1, total_num_batches)
             beg = batch_num * batch_size
             end = beg + batch_size
 
@@ -125,22 +159,9 @@ def choose_active(model_file, pretrained_net, mean_file, db, batch_size, num_bat
                 break
 
             X, y, batch_keys = batch
-            X -= sample_mean
+            X -= SAMPLE_MEAN
 
-            # net.forward(data=X)
-            # y_predicted = net.blobs["ip2"].data.argmax(axis=1)
-            # # uncert[beg:end] = net.blobs["uncertainty"].data.squeeze
-            # uncert[beg:end] = utils.entropy(utils.softmax(net.blobs["ip2"].data))
-            # correct[beg:end] = np.equal(y, y_predicted)
-
-            probs = np.zeros(net.blobs["ip2"].data.shape, dtype=np.float32)
-            for _ in xrange(10):
-                net.forward(data=X)
-                probs += utils.softmax(net.blobs['ip2'].data)
-            probs /= 10
-
-            uncert[beg:end] = utils.entropy(probs)
-            correct[beg:end] = np.equal(y, probs.argmax(axis=1))
+            uncert[beg:end], correct[beg, end] = uncertainty_dropout_sum(x, y, net)
             keys[beg:end] = batch_keys
 
     env.close()
@@ -152,7 +173,6 @@ def choose_active(model_file, pretrained_net, mean_file, db, batch_size, num_bat
     num_to_return = min((len(chosen_keys) / batch_size), num_batches_to_choose) * batch_size
     chosen_keys = chosen_keys[:num_to_return]
     skip_keys.update(chosen_keys)
-
 
     print 'Used {0} samples. Max used sample = {1}'.format(len(skip_keys), max(skip_keys))
     print 'Returning {0} new samples'.format(len(chosen_keys))

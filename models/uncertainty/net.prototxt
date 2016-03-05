@@ -1,5 +1,11 @@
 name: "CIFAR10_quick"
-#blabla
+
+
+###############################################################################
+### Data  #####################################################################
+###############################################################################
+
+
 layer {
   name: "cifar"
   type: "Data"
@@ -34,6 +40,12 @@ layer {
     backend: LMDB
   }
 }
+
+###############################################################################
+### Classification  ###########################################################
+###############################################################################
+
+
 layer {
   name: "conv1"
   type: "Convolution"
@@ -160,6 +172,17 @@ layer {
     stride: 2
   }
 }
+
+layer {
+  name: "drop"
+  type: "DropoutTest"
+  bottom: "pool3"
+  top: "pool3"
+  dropout_param {
+    dropout_ratio: 0.25
+  }
+}
+
 layer {
   name: "ip1"
   type: "InnerProduct"
@@ -204,6 +227,26 @@ layer {
     }
   }
 }
+
+###############################################################################
+### Cost  #####################################################################
+###############################################################################
+
+
+layer {
+  name: "loss"
+  type: "SoftmaxWithLoss"
+  bottom: "ip2"
+  bottom: "label"
+  top: "loss"
+}
+
+
+###############################################################################
+### Testing  ##################################################################
+###############################################################################
+
+
 layer {
   name: "accuracy"
   type: "Accuracy"
@@ -213,176 +256,4 @@ layer {
   include {
     phase: TEST
   }
-}
-
-
-layer {
-  name: "bn_unc0"
-  type: "BatchNorm"
-  bottom: "ip1"
-  top: "bn_unc0"
-  param {
-    lr_mult: 0
-  }
-  param {
-    lr_mult: 0
-  }
-  param {
-    lr_mult: 0
-  }
-}
-
-
-layer {
-  name: "ip_unc0"
-  type: "InnerProduct"
-  bottom: "bn_unc0"
-  top: "ip_unc0"
-  param {
-    lr_mult: 1
-  }
-  param {
-    lr_mult: 2
-  }
-  inner_product_param {
-    num_output: 150
-    weight_filler {
-      type: "msra"
-      variance_norm: AVERAGE
-    }
-    bias_filler {
-      type: "constant"
-      value: 0
-    }
-  }
-}
-
-
-
-layer {
-  name: "relu_unc0"
-  type: "ReLU"
-  bottom: "ip_unc0"
-  top: "ip_unc0"
-}
-
-layer {
-  name: "bn_unc1"
-  type: "BatchNorm"
-  bottom: "ip_unc0"
-  top: "bn_unc1"
-  param {
-    lr_mult: 0
-  }
-  param {
-    lr_mult: 0
-  }
-  param {
-    lr_mult: 0
-  }
-}
-
-
-layer {
-  name: "ip_unc1"
-  type: "InnerProduct"
-  bottom: "bn_unc1"
-  top: "ip_unc1"
-  param {
-    lr_mult: 1
-  }
-  param {
-    lr_mult: 2
-  }
-  inner_product_param {
-    num_output: 50
-    weight_filler {
-      type: "msra"
-      variance_norm: AVERAGE
-    }
-    bias_filler {
-      type: "constant"
-      value: 0
-    }
-  }
-}
-
-
-
-layer {
-  name: "relu_unc1"
-  type: "ReLU"
-  bottom: "ip_unc1"
-  top: "ip_unc1"
-}
-
-layer {
-  name: "bn_unc2"
-  type: "BatchNorm"
-  bottom: "ip_unc1"
-  top: "bn_unc2"
-  param {
-    lr_mult: 0
-  }
-  param {
-    lr_mult: 0
-  }
-  param {
-    lr_mult: 0
-  }
-}
-
-layer {
-  name: "uncertainty"
-  type: "InnerProduct"
-  bottom: "bn_unc2"
-  top: "uncertainty_raw"
-  param {
-    lr_mult: 1
-  }
-  param {
-    lr_mult: 2
-  }
-  inner_product_param {
-    num_output: 1
-    weight_filler {
-      #type: "gaussian"
-      #std: 1.0
-      type: "xavier"
-      variance_norm: AVERAGE
-    }
-    bias_filler {
-      type: "constant"
-      value: 0
-    }
-  }
-}
-
-
-
-layer {
-  name: "uncertainty_sigmoid"
-  type: "Sigmoid"
-  bottom: "uncertainty_raw"
-  top: "uncertainty"
-}
-
-
-layer {
-  name: "uncertainty_loss"
-  type: "UncertaintyLoss"
-  bottom: "ip2"
-  bottom: "label"
-  bottom: "uncertainty"
-  top: "uncertainty_loss"
-  loss_weight: 0.1
-}
-
-layer {
-  name: "loss"
-  type: "SoftmaxWithLoss"
-  bottom: "ip2"
-  bottom: "label"
-  top: "loss"
-  loss_weight: 0.9
 }
