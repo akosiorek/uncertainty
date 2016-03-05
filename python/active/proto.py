@@ -1,5 +1,7 @@
 
+import os
 from google.protobuf import text_format
+
 import caffe
 from caffe.proto.caffe_pb2 import SolverParameter, NetParameter, BlobShape
 
@@ -45,7 +47,7 @@ def write_db_to_net(net_proto, db, phase=caffe.TRAIN):
             break
 
 
-def prepare_solver(solver_path, out_path, prepared_net):
+def prepare_solver(solver_path, out_path, prepared_net, snapshot_path=None):
     print 'Preparing solver.prototxt...'
     proto = load_proto(solver_path, SolverParameter)
 
@@ -54,6 +56,9 @@ def prepare_solver(solver_path, out_path, prepared_net):
     proto.max_iter = ITER_TO_INIT
     proto.net = prepared_net
     proto.test_initialization = False
+
+    if snapshot_path is not None:
+        proto.snapshot_prefix = os.path.join(snapshot_path, 'snapshot')
 
     save_proto(out_path, proto)
     return proto.snapshot_prefix, proto.max_iter

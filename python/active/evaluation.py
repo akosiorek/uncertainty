@@ -2,7 +2,6 @@
 
 import os
 import sys
-import shutil
 import numpy as np
 
 os.environ['GLOG_minloglevel'] = '1'
@@ -78,9 +77,7 @@ class NetEvaluation(object):
         print
 
     def prepare_output_folder(self):
-        if os.path.exists(self.results_folder):
-            shutil.rmtree(self.results_folder)
-        os.mkdir(self.results_folder)
+        utils.clear_dir(self.results_folder)
 
     def init_output_storage(self):
         self.uncertainty = np.zeros(self.db_size, dtype=np.float32)

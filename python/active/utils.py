@@ -1,7 +1,7 @@
 import os
 import sys
 import re
-import importlib
+import shutil
 
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
@@ -86,6 +86,12 @@ def write_to_file(path, container, sep='\n'):
 
 def create_temp_path(path):
     return os.path.join('/tmp', os.path.basename(path))
+
+
+def clear_dir(path):
+    if os.path.exists(path):
+        shutil.rmtree(path)
+    os.mkdir(path)
 
 
 if __name__ == '__main__':

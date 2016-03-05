@@ -127,11 +127,20 @@ def choose_active(model_file, pretrained_net, mean_file, db, batch_size, num_bat
             X, y, batch_keys = batch
             X -= sample_mean
 
-            net.forward(data=X)
-            y_predicted = net.blobs["ip2"].data.argmax(axis=1)
-            # uncert[beg:end] = net.blobs["uncertainty"].data.squeeze()
-            uncert[beg:end] = utils.entropy(utils.softmax(net.blobs["ip2"].data))
-            correct[beg:end] = np.equal(y, y_predicted)
+            # net.forward(data=X)
+            # y_predicted = net.blobs["ip2"].data.argmax(axis=1)
+            # # uncert[beg:end] = net.blobs["uncertainty"].data.squeeze
+            # uncert[beg:end] = utils.entropy(utils.softmax(net.blobs["ip2"].data))
+            # correct[beg:end] = np.equal(y, y_predicted)
+
+            probs = np.zeros(net.blobs["ip2"].data.shape, dtype=np.float32)
+            for _ in xrange(10):
+                net.forward(data=X)
+                probs += utils.softmax(net.blobs['ip2'].data)
+            probs /= 10
+
+            uncert[beg:end] = utils.entropy(probs)
+            correct[beg:end] = np.equal(y, probs.argmax(axis=1))
             keys[beg:end] = batch_keys
 
     env.close()

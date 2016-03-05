@@ -14,14 +14,14 @@ UNCERTS = ['max_unc', 'entropy_conf', 'entropy_ip2', '2_max_ip2', 'entropy_weigh
 NUM_UNC = len(UNCERTS)
 
 
-class EvaluationExpanded(NetEvaluation):
+class EvaluationMixtureModel(NetEvaluation):
 
     def __init__(self, net_path, db_path, snapshot_path, results_folder, every_iter=None):
-        super(EvaluationExpanded, self).__init__(net_path, db_path, snapshot_path, results_folder, every_iter)
+        super(EvaluationMixtureModel, self).__init__(net_path, db_path, snapshot_path, results_folder, every_iter)
         self.output_folders = [os.path.join(results_folder, output_name) for output_name in UNCERTS]
 
     def prepare_output_folder(self):
-        super(EvaluationExpanded, self).prepare_output_folder()
+        super(EvaluationMixtureModel, self).prepare_output_folder()
         for output_folder in self.output_folders:
             os.mkdir(output_folder)
 
@@ -70,5 +70,5 @@ if __name__ == '__main__':
         every_iter = None
 
     caffe.set_mode_gpu()
-    evaluation = EvaluationExpanded(net_path, db_path, snapshot_folder, results_folder, every_iter)
+    evaluation = EvaluationMixtureModel(net_path, db_path, snapshot_folder, results_folder, every_iter)
     evaluation.evaluate()

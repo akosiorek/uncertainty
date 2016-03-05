@@ -91,6 +91,12 @@ if __name__ == '__main__':
     args = sys.argv[1:]
     solver_path = args[0]
 
+    if len(args) > 1:
+        snapshot_path = args[1]
+        utils.clear_dir(snapshot_path)
+    else:
+        snapshot_path = None
+
     caffe.set_mode_gpu()
     # caffe.set_mode_cpu()
 
@@ -104,9 +110,9 @@ if __name__ == '__main__':
 
     # TODO: remove; for now needed since the active db does not exist yet and init doesn't work
     proto.prepare_net(net_path, active_net_path, train_db_path)
-    snapshot_prefix, snapshot_iter = proto.prepare_solver(solver_path, active_solver_path, active_net_path)
+    snapshot_prefix, snapshot_iter = proto.prepare_solver(solver_path, active_solver_path, active_net_path, snapshot_path)
 
-    # init_network(active_solver_path)
+    init_network(active_solver_path)
 
     batch_size, mean_file = proto.get_batch_mean_from_net(net_path)
     proto.prepare_net(net_path, active_net_path, active_db_path)
