@@ -94,6 +94,11 @@ def clear_dir(path):
     os.mkdir(path)
 
 
+def append_to_file(path, msg, sep='\n'):
+    with open(path, 'a') as f:
+        f.write(msg)
+        f.write(sep)
+
 if __name__ == '__main__':
     for num, snapshot in get_snapshot_files(sys.argv[1], every_iter=int(sys.argv[2])):
         print num, snapshot

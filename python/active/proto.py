@@ -1,11 +1,8 @@
-
 import os
 from google.protobuf import text_format
 
 import caffe
 from caffe.proto.caffe_pb2 import SolverParameter, NetParameter, BlobShape
-
-ITER_TO_INIT = 1000
 
 
 def load_proto(path, proto_type):
@@ -47,18 +44,20 @@ def write_db_to_net(net_proto, db, phase=caffe.TRAIN):
             break
 
 
-def prepare_solver(solver_path, out_path, prepared_net, snapshot_path=None):
+def prepare_solver(solver_path, out_path, prepared_net, snapshot_path=None, iters_to_init=None):
     print 'Preparing solver.prototxt...'
     proto = load_proto(solver_path, SolverParameter)
 
     proto.snapshot = 0
     proto.snapshot_after_train = True
-    proto.max_iter = ITER_TO_INIT
     proto.net = prepared_net
     proto.test_initialization = False
 
     if snapshot_path is not None:
         proto.snapshot_prefix = os.path.join(snapshot_path, 'snapshot')
+
+    if iters_to_init is not None:
+        proto.max_iter = iters_to_init
 
     save_proto(out_path, proto)
     return proto.snapshot_prefix, proto.max_iter
@@ -128,6 +127,14 @@ def increase_max_iters(solver_path, how_many):
 
     proto.max_iter += how_many
     save_proto(solver_path, proto)
+
+
+def solverstate_path(snapshot_prefix, iter):
+    return '{0}_iter_{1}.solverstate.h5'.format(snapshot_prefix, iter)
+
+
+def caffemodel_path(snapshot_prefix, iter):
+    return '{0}_iter_{1}.caffemodel.h5'.format(snapshot_prefix, iter)
 
 
 if __name__ == '__main__':

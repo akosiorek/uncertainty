@@ -6,12 +6,13 @@ import numpy as np
 
 os.environ['GLOG_minloglevel'] = '1'
 import caffe
-
 import lmdb
+
+import db
 import utils
 import proto
 import samples
-import active_learning
+import learn
 
 
 class NetEvaluation(object):
@@ -31,10 +32,10 @@ class NetEvaluation(object):
         print 'Initializing...'
 
         self.batch_size, mean_path = proto.get_batch_mean_from_net(self.net_path)
-        self.input_shape = samples.entry_shape(self.db_path)
-        self.db_size = samples.len_db(self.db_path)
+        self.input_shape = db.entry_shape(self.db_path)
+        self.db_size = db.size(self.db_path)
         self.num_batches = self.db_size / self.batch_size
-        self.deploy_net_path = os.path.join('/tmp', os.path.basename(self.net_path) + '.deploy' + active_learning.POSTFIX)
+        self.deploy_net_path = os.path.join('/tmp', os.path.basename(self.net_path) + '.deploy' + learn.POSTFIX)
 
         self.mean = samples.read_meanfile(mean_path)
         proto.prepare_deploy_net(self.net_path, self.deploy_net_path, self.batch_size, self.input_shape)

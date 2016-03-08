@@ -4,37 +4,12 @@ import caffe
 import lmdb
 
 import utils
+import db
 
 
 DROPOUT_ITERS = 10
 OUTPUT_LAYER = 'ip2'
 SAMPLE_MEAN = None
-
-
-def entry_shape(db_path):
-
-    env = lmdb.open(db_path, readonly=True)
-    with env.begin() as txn:
-        cursor = txn.cursor()
-
-        cursor.first()
-        key, raw_datum = cursor.item()
-        datum = caffe.proto.caffe_pb2.Datum()
-        datum.ParseFromString(raw_datum)
-
-        shape = datum.channels, datum.height, datum.width
-    env.close()
-    return shape
-
-
-def len_db(db_path):
-    env = lmdb.open(db_path, readonly=True)
-    size = 0
-    with env.begin() as txn:
-        for _ in txn.cursor():
-            size += 1
-    env.close()
-    return size
 
 
 def read_meanfile(mean_path):
@@ -44,12 +19,6 @@ def read_meanfile(mean_path):
     blob.ParseFromString(data)
     arr = np.array(caffe.io.blobproto_to_array(blob))
     return arr[0]
-
-
-def move_cursor_circular(cursor):
-    moved = cursor.next()
-    if not moved:
-        cursor.first()
 
 
 def build_batch(cursor, batch_size, input_shape, skip_keys=None):
@@ -62,7 +31,7 @@ def build_batch(cursor, batch_size, input_shape, skip_keys=None):
     index = 0
     while index < batch_size:
         key, raw_datum = cursor.item()
-        move_cursor_circular(cursor)
+        db.move_cursor_circular(cursor)
 
         # check if we've seen this key already
         if first_key is None:
@@ -119,8 +88,23 @@ def uncertainty_base_case(X, y, net):
     return uncert, correct
 
 
+def criterium(uncertainty, correct, keys):
+
+    keys = keys[correct]
+    uncertainty = uncertainty[correct]
+    threshold = 0.3
+    sorted_keys = sorted(zip(uncertainty, keys), key=lambda x: x[0], reverse=True)
+
+    for i in xrange(0, len(sorted_keys), len(sorted_keys)/10):
+        print sorted_keys[i]
+
+    sorted_keys = [x[1] for x in sorted_keys if x[0] > threshold]
+    print 'Chosen {0} keys with threshold {1}'.format(len(sorted_keys), threshold)
+    return sorted_keys
+
+
 def choose_active(model_file, pretrained_net, mean_file, db, batch_size, num_batches_to_choose, total_num_batches,
-                  input_shape, skip_keys=set(), criterium=None):
+                  input_shape, skip_keys=set()):
 
     print 'Choosing active samples....'
 
@@ -161,7 +145,7 @@ def choose_active(model_file, pretrained_net, mean_file, db, batch_size, num_bat
             X, y, batch_keys = batch
             X -= SAMPLE_MEAN
 
-            uncert[beg:end], correct[beg, end] = uncertainty_dropout_sum(x, y, net)
+            uncert[beg:end], correct[beg:end] = uncertainty_dropout_sum(X, y, net)
             keys[beg:end] = batch_keys
 
     env.close()
