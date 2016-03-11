@@ -15,6 +15,7 @@ def value(x):
 
 
 def filter_and_sort(header, files):
+    files = [f for f in files if f.endswith('.txt')]
     l = [f for f in files if f.startswith(header)]
     return sorted(l, key=value)
 
@@ -26,48 +27,53 @@ def read_file(path):
     return np.asarray([float(s.strip()) for s in samples if s])
 
 
-if __name__ == '__main__':
-    folder = sys.argv[1]
-    files = os.listdir(folder)
+def compute_accuracy_uncertainty(results_folder):
+    files = os.listdir(results_folder)
 
     label_files = filter_and_sort('label', files)
     uncert_files = filter_and_sort('uncert', files)
 
-    max_file = uncert_files[-1]
-    max_num = os.path.splitext(max_file)[0].split('_')[-1]
-    max_num = int(max_num)
+    result = {
+        'mean_uncert': [],
+        'mean_uncert_pos': [],
+        'mean_uncert_neg': [],
+        'uncertainties': [],
+        'accuracy': [],
+        'iter': []
+    }
 
-    mean_uncert = []
-    mean_uncert_pos = []
-    mean_uncert_neg = []
-    mean_acc = []
-    uncertss = []
-
-    x = []
     for (label_file, uncert_file) in zip(label_files, uncert_files):
-        x.append(int(re.search(r'_(\d+)', label_file).groups()[0]))
-        labels = read_file(os.path.join(folder, label_file))
-        uncerts = read_file(os.path.join(folder, uncert_file))
+        labels = read_file(os.path.join(results_folder, label_file))
+        uncerts = read_file(os.path.join(results_folder, uncert_file))
 
-        uncertss.append(uncerts)
+        result['mean_uncert'].append(uncerts.mean())
+        result['mean_uncert_pos'].append(uncerts[labels > 0].mean())
+        result['mean_uncert_neg'].append(uncerts[labels == 0].mean())
+        result['uncertainties'].append(uncerts)
+        result['accuracy'].append(labels.mean())
+        result['iter'].append(int(re.search(r'_(\d+)', label_file).groups()[0]))
 
-        mean_uncert.append(uncerts.mean())
-        mean_uncert_pos.append(uncerts[labels > 0].mean())
-        mean_uncert_neg.append(uncerts[labels == 0].mean())
-        mean_acc.append(labels.mean())
+    return result
+
+
+if __name__ == '__main__':
+    folder = sys.argv[1]
+    result = compute_accuracy_uncertainty(folder)
+
 
     plt.figure()
-    plt.plot(x, mean_acc, 'g', label='accuracy', linewidth=2)
-    plt.plot(x, mean_uncert, 'r', label='uncertainty', linewidth=2)
-    plt.plot(x, mean_uncert_pos, 'y', label='uncertainty pos', linewidth=2)
-    plt.plot(x, mean_uncert_neg, 'm', label='uncertainty neg', linewidth=2)
+    x = result['iter']
+    plt.plot(x, result['accuracy'], 'g', label='accuracy', linewidth=2)
+    plt.plot(x, result['mean_uncert'], 'r', label='uncertainty', linewidth=2)
+    plt.plot(x, result['mean_uncert_pos'], 'y', label='uncertainty pos', linewidth=2)
+    plt.plot(x, result['mean_uncert_neg'], 'm', label='uncertainty neg', linewidth=2)
     plt.title('Uncertainty and Accuracy for CIFAR-10')
     plt.legend(loc='best')
     plt.xlabel('Number of training iterations')
     plt.grid()
     plt.savefig('uncert_and_acc_plot.png')
 
-    uncertss = zip(*uncertss)
+    uncertss = zip(*result['uncertainties'])
     plt.figure()
     for i in xrange(50, 55):
         plt.plot(x, uncertss[i], linewidth=2, label=str(np.mean(uncertss[i])))
@@ -78,7 +84,7 @@ if __name__ == '__main__':
     plt.xlabel('Number of training iterations')
     plt.savefig('sample_uncert_evolution.png')
 
-    scores = zip(x, mean_uncert)
+    scores = zip(x, result['mean_uncert'], result['accuracy'])
     scores = sorted(scores, key=lambda x:x[0])
     for s in scores:
-        print 'iter = {:06}, uncertainty = {}'.format(*s)
+        print 'iter = {:6}, uncertainty = {}, accuracy = {}'.format(*s)
