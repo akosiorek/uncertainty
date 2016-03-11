@@ -30,7 +30,7 @@ max_iter: 5000
 # snapshot intermediate results
 snapshot: 100
 snapshot_format: HDF5
-snapshot_prefix: "models/uncertainty/snapshot_10k/snapshot"
+snapshot_prefix: "models/uncertainty/snapshot_30k/snapshot"
 
 # solver mode: CPU or GPU
 solver_mode: GPU

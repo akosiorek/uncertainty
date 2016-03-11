@@ -28,42 +28,28 @@ def keys_per_category(db_path):
 
 def split_dbs(input_db, output_dbs, percent_in_first, shuffle=True):
 
-    map_size = 2**40
-
     keys_per_cat = keys_per_category(input_db)
 
     samples_num = {}
     for key in keys_per_cat.keys():
-        if percent_in_first < 1:
-            first = round(percent_in_first * len(keys_per_cat[key]))
-        else:
-            first = percent_in_first
+        first = percent_in_first
+        if first < 1:
+            first = round(first * len(keys_per_cat[key]))
+
         second = len(keys_per_cat[key])
         samples_num[key] = (0, int(first), second)
 
-    if shuffle:
-        for key in keys_per_cat.keys():
-            random.shuffle(keys_per_cat[key])
+        if shuffle:
+                random.shuffle(keys_per_cat[key])
 
-    env_in = lmdb.open(input_db, readonly=True, map_size=map_size)
-    with env_in.begin() as txn_in:
-        cursor_in = txn_in.cursor()
-        for db_num, output_db in enumerate(output_dbs):
-            env_out = lmdb.open(output_db, readonly=False, map_size=map_size)
-            idx = 0
+    for db_num, output_db in enumerate(output_dbs):
+        sample_keys = []
+        for cat, samples_per_cat in keys_per_cat.items():
+            for sample_idx in xrange(samples_num[cat][db_num], samples_num[cat][db_num + 1]):
+                sample_keys.append(samples_per_cat[sample_idx])
 
-            with env_out.begin(write=True) as txn_out:
-                for cat, sample_keys in keys_per_cat.items():
-                    for sample_idx in xrange(samples_num[cat][db_num], samples_num[cat][db_num + 1]):
-                        key = keys_per_cat[cat][sample_idx]
+        db.extract_samples(input_db, output_db, sample_keys, shuffle=shuffle)
 
-                        txn_out.put(db.str_id(idx), cursor_in.get(key))
-                        idx += 1
-                        if idx % 1000 == 0:
-                            print 'Processed {0:8} samples for db: {1}'.format(idx, output_db)
-
-            env_out.close()
-    env_in.close()
 
 if __name__ == '__main__':
     if len(sys.argv) != 5:

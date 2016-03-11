@@ -6,6 +6,8 @@ import lmdb
 
 import caffe.proto.caffe_pb2
 
+LOG_EVERY = 10000
+
 
 def extract_samples(input_db, output_db, sample_keys, shuffle=True):
 
@@ -23,14 +25,21 @@ def extract_samples(input_db, output_db, sample_keys, shuffle=True):
     if shuffle:
         random.shuffle(ids)
 
+    num = 0
     with env_in.begin() as txn_in:
         cursor_in = txn_in.cursor()
         with env_out.begin(write=True) as txn_out:
             for id, key in zip(ids, sample_keys):
                 txn_out.put(str_id(id), cursor_in.get(key))
 
+                num += 1
+                if num % LOG_EVERY == 0:
+                    print 'Stored {0:8} samples in {1}'.format(num, output_db)
+
     env_in.close()
     env_out.close()
+    if num % LOG_EVERY != 0:
+        print 'Stored {0:8} samples in {1}'.format(num, output_db)
 
 
 def entry_shape(db_path):

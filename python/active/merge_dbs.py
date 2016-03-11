@@ -27,11 +27,15 @@ def merge_dbs(input_dbs, output_db, shuffle=True):
                 for key, data in txn_in.cursor():
                     txn_out.put(db.str_id(ids[idx]), data)
                     idx += 1
-                    if idx % 1000 == 0:
+                    if idx % db.LOG_EVERY == 0:
                         print 'Processed {0} samples'.format(idx)
 
         env_in.close()
     env_out.close()
+
+    if idx % db.LOG_EVERY != 0:
+        print 'Processed {0} samples'.format(idx)
+
 
 if __name__ == '__main__':
     if len(sys.argv) < 4:
