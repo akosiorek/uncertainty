@@ -27,8 +27,7 @@ def extract_samples(input_db, output_db, sample_keys, shuffle=True):
         cursor_in = txn_in.cursor()
         with env_out.begin(write=True) as txn_out:
             for id, key in zip(ids, sample_keys):
-                str_id = '{:08}'.format(id)
-                txn_out.put(str_id, cursor_in.get(key))
+                txn_out.put(str_id(id), cursor_in.get(key))
 
     env_in.close()
     env_out.close()
@@ -64,3 +63,7 @@ def move_cursor_circular(cursor):
     moved = cursor.next()
     if not moved:
         cursor.first()
+
+
+def str_id(num):
+    return '{:08}'.format(num)

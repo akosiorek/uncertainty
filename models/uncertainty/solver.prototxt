@@ -5,10 +5,10 @@ net: "models/uncertainty/net.prototxt"
 # test_iter specifies how many forward passes the test should carry out.
 # In the case of MNIST, we have test batch size 100 and 100 test iterations,
 # covering the full 10,000 testing images.
-test_iter: 5
+test_iter: 50
 
 # Carry out testing every 500 training iterations.
-test_interval: 1000
+test_interval: 5000
 
 # The base learning rate, momentum and the weight decay of the network.
 base_lr: 1e-3
@@ -30,7 +30,7 @@ max_iter: 5000
 # snapshot intermediate results
 snapshot: 100
 snapshot_format: HDF5
-snapshot_prefix: "models/uncertainty/snapshot/snapshot"
+snapshot_prefix: "models/uncertainty/snapshot_10k/snapshot"
 
 # solver mode: CPU or GPU
 solver_mode: GPU
