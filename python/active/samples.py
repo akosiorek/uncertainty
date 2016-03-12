@@ -103,8 +103,41 @@ def criterium(uncertainty, correct, keys):
     return sorted_keys
 
 
+class SamplePool(object):
+
+    def __init__(self):
+        pass
+
+
+class Policy(object):
+    pass
+
+class Scorer(object):
+    pass
+
+
+def setup():
+
+    db_path = ''
+    scorer = Scorer()
+    policy = Policy()
+
+    pool = SamplePool(db_path, scorer, policy)
+
+    epochs = 10
+
+    for e in xrange(epochs):
+        # run epoch
+        for batch in pool:
+            pass
+
+        SamplePool.reset()
+
+
+
+
 def choose_active(model_file, pretrained_net, mean_file, db, batch_size, num_batches_to_choose, total_num_batches,
-                  input_shape, skip_keys=set()):
+                  input_shape, skip_keys=set(), used_samples=set(), max_samples_to_use=-1):
 
     print 'Choosing active samples....'
 

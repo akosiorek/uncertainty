@@ -11,6 +11,7 @@ LOG_EVERY = 10000
 
 def extract_samples(input_db, output_db, sample_keys, shuffle=True):
 
+    return_keys = False
     if os.path.exists(output_db):
         shutil.rmtree(output_db)
 
@@ -18,6 +19,16 @@ def extract_samples(input_db, output_db, sample_keys, shuffle=True):
 
     env_in = lmdb.open(input_db, readonly=True, map_size=map_size)
     env_out = lmdb.open(output_db, readonly=False, map_size=map_size)
+
+    # pick sample_keys random samples
+    if isinstance(sample_keys, int):
+        return_keys = True
+        keys = []
+        with env_in.begin() as txn_in:
+            for key, data in txn_in:
+                keys.append(key)
+        random.shuffle(keys)
+        sample_keys = keys[:sample_keys]
 
     sample_keys = sorted(sample_keys)
     ids = range(len(sample_keys))
@@ -40,6 +51,9 @@ def extract_samples(input_db, output_db, sample_keys, shuffle=True):
     env_out.close()
     if num % LOG_EVERY != 0:
         print 'Stored {0:8} samples in {1}'.format(num, output_db)
+
+    if return_keys:
+        return set(sample_keys)
 
 
 def entry_shape(db_path):

@@ -59,7 +59,7 @@ def get_snapshot_files(snapshot_folder, solverstate=False, every_iter=None):
 
     if every_iter is not None:
         indices = [0]
-        last = files[0][0] + every_iter
+        last = every_iter
 
         nn = NearestNeighbors()
         nums = np.asarray([f[0] for f in files])[:, np.newaxis]

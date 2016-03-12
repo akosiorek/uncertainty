@@ -14,6 +14,8 @@ UNCERTS = ['max_unc', 'entropy_conf', 'entropy_ip2', '2_max_ip2', 'entropy_weigh
 NUM_UNC = len(UNCERTS)
 
 
+
+# TODO: doesn't work
 class EvaluationMixtureModel(NetEvaluation):
 
     def __init__(self, net_path, db_path, snapshot_path, results_folder, every_iter=None):

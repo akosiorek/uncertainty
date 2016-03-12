@@ -47,39 +47,55 @@ def train_network(solver_path, snapshot_path):
         subprocess.call(cmd.split(' '), stdout=f, stderr=subprocess.STDOUT)
 
 
-def learn(solver_path, snapshot_path, iters_to_init):
+def learn(solver_path, snapshot_path, iters_to_init, max_samples_to_use):
     net_path = proto.get_net_from_solver(solver_path)
     train_db_path = proto.get_db_from_net(net_path)
 
+# setup sample budgeting
+    batch_size, mean_file = proto.get_batch_mean_from_net(net_path)
+    train_db_len = db.size(train_db_path)
+    total_num_batches = train_db_len / batch_size
+    max_samples_to_use = min(train_db_len, max_samples_to_use)
+    num_used_samples = iters_to_init * batch_size
+
+    if num_used_samples > max_samples_to_use:
+        iters_to_init = max_samples_to_use / batch_size
+        num_used_samples = iters_to_init * batch_size
+
+# prepare path to the temporary model files
     active_solver_path = utils.create_temp_path(solver_path + POSTFIX)
     active_net_path = utils.create_temp_path(net_path + POSTFIX)
     active_db_path = utils.create_temp_path(train_db_path + POSTFIX)
     deploy_net_path = utils.create_temp_path(net_path + '.deploy' + POSTFIX)
 
-    # TODO: remove; for now needed since the active db does not exist yet and init doesn't work
-    proto.prepare_net(net_path, active_net_path, train_db_path)
-    snapshot_prefix, snapshot_iter = proto.prepare_solver(solver_path, active_solver_path, active_net_path, snapshot_path, iters_to_init)
-
-    solverstate_path = proto.solverstate_path(snapshot_prefix, iters_to_init)
-    if not os.path.exists(solverstate_path):
-        init_network(active_solver_path)
-
-    batch_size, mean_file = proto.get_batch_mean_from_net(net_path)
+# prepare temporary model files
     proto.prepare_net(net_path, active_net_path, active_db_path)
+    snapshot_prefix, snapshot_iter = proto.prepare_solver(
+        solver_path, active_solver_path, active_net_path, snapshot_path, iters_to_init
+    )
+
+    # recover the snapshot folder
+    snapshot_path = '/'.join(snapshot_prefix.split('/')[:-1])
+    epoch_file = os.path.join(snapshot_path, EPOCH_FILE)
 
     # deploy net
     input_shape = db.entry_shape(train_db_path)
     proto.prepare_deploy_net(net_path, deploy_net_path, batch_size, input_shape)
 
-    epoch_file = os.path.join(snapshot_path, EPOCH_FILE)
-    train_db_len = db.size(train_db_path)
+# initialize net
+    used_samples = set()
+    solverstate_path = proto.solverstate_path(snapshot_prefix, iters_to_init)
+    if not os.path.exists(solverstate_path):
+        used_samples = db.extract_samples(train_db_path, active_db_path, num_used_samples)
+        init_network(active_solver_path)
+
+# do the real learning
     print 'train samples:', train_db_len
     for epoch in xrange(MAX_EPOCHS):
         print 'Epoch #{0}'.format(epoch)
-        used_samples = set()
-        iters_to_do = 1
+        epoch_used_samples = set()
 
-        while len(used_samples) < train_db_len:
+        while len(epoch_used_samples) < train_db_len:
 
             solverstate_path = proto.solverstate_path(snapshot_prefix, snapshot_iter)
             caffemodel_path = proto.caffemodel_path(snapshot_prefix, snapshot_iter)
@@ -88,12 +104,12 @@ def learn(solver_path, snapshot_path, iters_to_init):
 
             active_samples = samples.choose_active(
                     deploy_net_path, caffemodel_path, mean_file, train_db_path,
-                    batch_size, BATCHES_PER_RUN, train_db_len/batch_size, input_shape, used_samples
+                    batch_size, BATCHES_PER_RUN, total_num_batches, input_shape, epoch_used_samples,
+                    used_samples, max_samples_to_use
             )
 
-            iters_to_do = min(len(active_samples) / batch_size, BATCHES_PER_RUN)
-
             # check if it makes sense to continue
+            iters_to_do = len(active_samples) / batch_size
             if iters_to_do == 0:
                 break
 
@@ -109,20 +125,24 @@ if __name__ == '__main__':
     args = sys.argv[1:]
     solver_path = args[0]
 
+    snapshot_path = None
+    iters_to_init = ITERS_TO_INIT
+    max_samples_to_use = sys.maxint
+
     if len(args) > 1:
         snapshot_path = args[1]
         if not os.path.exists(snapshot_path):
             os.mkdir(snapshot_path)
-    else:
-        snapshot_path = None
 
     if len(args) > 2:
         iters_to_init = int(args[2])
-    else:
-        iters_to_init = ITERS_TO_INIT
+
+    if len(args) > 3:
+        max_samples_to_use = int(args[3])
+
 
     caffe.set_mode_gpu()
-    learn(solver_path, snapshot_path, iters_to_init)
+    learn(solver_path, snapshot_path, iters_to_init, max_samples_to_use)
 
 
 

@@ -122,6 +122,11 @@ def get_batch_mean_from_net(net_path):
     return batch_size, mean_file
 
 
+def get_db_from_net(net_path):
+    proto = load_proto(net_path, NetParameter)
+    return proto.layer[0].data_param.source
+
+
 def increase_max_iters(solver_path, how_many):
     proto = load_proto(solver_path, SolverParameter)
 
