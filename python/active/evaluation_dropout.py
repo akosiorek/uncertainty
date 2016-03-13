@@ -5,7 +5,8 @@ import sys
 
 os.environ['GLOG_minloglevel'] = '1'
 import caffe
-from evaluation import DropoutNet, NetEvaluation
+import net
+import evaluation
 
 DROPOUT_ITERS = 10
 
@@ -23,6 +24,6 @@ if __name__ == '__main__':
         every_iter = None
 
     caffe.set_mode_gpu()
-    net = DropoutNet(net_path, DROPOUT_ITERS, aggregate='mean', output_layers=['ip2'])
-    evaluation = NetEvaluation(net, db_path, snapshot_folder, results_folder, every_iter)
+    net = net.DropoutNet(net_path, DROPOUT_ITERS, aggregate='mean', output_layers=['ip2'])
+    evaluation = evaluation.NetEvaluation(net, db_path, snapshot_folder, results_folder, every_iter)
     evaluation.evaluate()
