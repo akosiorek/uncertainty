@@ -6,9 +6,7 @@ import numpy as np
 
 os.environ['GLOG_minloglevel'] = '1'
 import caffe
-import lmdb
 
-import db
 import utils
 import samples
 import config
@@ -26,10 +24,9 @@ class NetEvaluation(object):
 
     def init(self):
         print 'Initializing...'
-
-        self.db_size = db.size(self.db_path)
-        self.num_batches = self.db_size / self.net.batch_size
-        self.net.input_shape = db.entry_shape(self.db_path)
+        self.dataset = samples.Dataset(self.db_path, self.net.batch_size)
+        self.net.input_shape = self.dataset.entry_shape
+        self.num_batches = self.dataset.num_batches()
 
         if os.path.isdir(self.snapshot_path):
             self.snapshots = utils.get_snapshot_files(self.snapshot_path, every_iter=self.every_iter)
@@ -39,7 +36,6 @@ class NetEvaluation(object):
         self.prepare_output_folder()
         self.init_output_storage()
 
-        self.net.init()
         self.initialized = True
 
     def evaluate(self):
@@ -47,34 +43,28 @@ class NetEvaluation(object):
             self.init()
 
         print 'Evaluating...'
-
+        self.dataset.open()
         for snapshot_num, snapshot_path in self.snapshots:
             print 'Processing snapshot #{0}'.format(snapshot_num)
             self.compute(snapshot_path)
             self.process_output(snapshot_num)
+        self.dataset.close()
 
     def compute(self, snapshot_path):
         self.net.load_model(snapshot_path)
-        env = lmdb.open(self.db_path, readonly=True)
-
-        with env.begin() as txn:
-            cursor = txn.cursor()
-            cursor.first()
-
-            for itr in xrange(self.num_batches):
-                utils.wait_bar('Evaluating batch ', '...', itr+1, self.num_batches)
-
-                X, y, keys = samples.build_batch(cursor, self.net.batch_size, self.net.input_shape)
-                output = self.net.forward(X)
-                self.process_intermediate_output(itr, X, y, output)
+        for batch_num, batch in enumerate(self.dataset):
+            utils.wait_bar('Evaluating batch ', '...', batch_num + 1, self.num_batches)
+            X, y, keys = batch
+            output = self.net.forward(X)
+            self.process_intermediate_output(batch_num, X, y, output)
         print
 
     def prepare_output_folder(self):
         utils.clear_dir(self.results_folder)
 
     def init_output_storage(self):
-        self.uncertainty = np.zeros(self.db_size, dtype=np.float32)
-        self.correct = np.zeros(self.db_size, dtype=np.int8)
+        self.uncertainty = np.zeros(len(self.dataset), dtype=np.float32)
+        self.correct = np.zeros(len(self.dataset), dtype=np.int8)
 
     def process_intermediate_output(self, itr, X, y, output):
         beg = itr * self.net.batch_size

@@ -6,53 +6,6 @@ import utils
 import db
 
 
-def build_batch(cursor, batch_size, input_shape, skip_keys=None):
-
-    X = np.zeros([batch_size] + list(input_shape), dtype=np.float32)
-    y = np.zeros(batch_size, dtype=np.int32)
-    keys = np.zeros(batch_size, dtype=np.object)
-
-    first_key = None
-    index = 0
-    while index < batch_size:
-        key, raw_datum = cursor.item()
-        db.move_cursor_circular(cursor)
-
-        # check if we've seen this key already
-        if first_key is None:
-            first_key = key
-        elif first_key == key:
-            return None
-
-        if skip_keys is not None:
-            if key in skip_keys:
-                continue
-
-        datum = caffe.proto.caffe_pb2.Datum()
-        datum.ParseFromString(raw_datum)
-        flat_x = np.fromstring(datum.data, dtype=np.uint8)
-        X[index] = flat_x.reshape(datum.channels, datum.height, datum.width)
-        y[index] = datum.label
-        keys[index] = key
-        index += 1
-
-    return X, y, keys
-
-
-def criterium(uncertainty, correct, keys):
-
-    # keys = keys[correct]
-    # uncertainty = uncertainty[correct]
-    threshold = 0.9
-    sorted_keys = sorted(zip(uncertainty, keys), key=lambda x: x[0], reverse=True)
-
-    for i in xrange(0, len(sorted_keys), len(sorted_keys)/10):
-        print sorted_keys[i]
-
-    sorted_keys = [x[1] for x in sorted_keys if x[0] > threshold]
-    print 'Chosen {0} keys with threshold {1}'.format(len(sorted_keys), threshold)
-    return sorted_keys
-
 # class SamplePool(object):
 #
 #     def __init__(self):
@@ -122,7 +75,6 @@ class Dataset(object):
             self.close()
 
         self.env = lmdb.open(self.db_path, readonly=True, map_size=self.map_size)
-        self.first()
 
     def close(self):
         self.env.close()
@@ -130,18 +82,6 @@ class Dataset(object):
 
     def is_opened(self):
         return self.env is not None
-
-    def go_to_index(self, cursor, index):
-        if index > self.size:
-            raise ValueError('Index out of bounds')
-
-        cursor.first()
-        while index > 0:
-            index -= 1
-            cursor.next()
-
-    def first(self):
-        self.index = 0
 
     def __iter__(self):
         X = np.zeros([self.batch_size] + list(self.entry_shape), dtype=np.float32)
@@ -166,6 +106,21 @@ class Dataset(object):
                 if index == self.batch_size:
                     yield X, y, keys
                     index = 0
+
+
+def criterium(uncertainty, correct, keys):
+
+    # keys = keys[correct]
+    # uncertainty = uncertainty[correct]
+    threshold = 0.9
+    sorted_keys = sorted(zip(uncertainty, keys), key=lambda x: x[0], reverse=True)
+
+    for i in xrange(0, len(sorted_keys), len(sorted_keys)/10):
+        print sorted_keys[i]
+
+    sorted_keys = [x[1] for x in sorted_keys if x[0] > threshold]
+    print 'Chosen {0} keys with threshold {1}'.format(len(sorted_keys), threshold)
+    return sorted_keys
 
 
 def choose_active(net, db_path, num_batches_to_choose, skip_keys=set()):
