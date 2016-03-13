@@ -11,6 +11,7 @@ import lmdb
 import db
 import utils
 import samples
+import config
 
 
 class NetEvaluation(object):
@@ -107,7 +108,7 @@ if __name__ == '__main__':
         every_iter = None
 
     caffe.set_mode_gpu()
-    net = net.Net(net_path, output_layers=['ip2'])
+    net = net.Net(net_path, output_layers=config.OUTPUT_LAYERS)
     evaluation = NetEvaluation(net, db_path, snapshot_folder, results_folder, every_iter)
     evaluation.evaluate()
 

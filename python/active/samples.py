@@ -7,11 +7,6 @@ import utils
 import db
 
 
-DROPOUT_ITERS = 10
-OUTPUT_LAYER = 'ip2'
-SAMPLE_MEAN = None
-
-
 def read_meanfile(mean_path):
     print 'Reading mean file...'
     data = open(mean_path , 'rb').read()
@@ -90,9 +85,9 @@ def uncertainty_base_case(X, y, net):
 
 def criterium(uncertainty, correct, keys):
 
-    keys = keys[correct]
-    uncertainty = uncertainty[correct]
-    threshold = 0.3
+    # keys = keys[correct]
+    # uncertainty = uncertainty[correct]
+    threshold = 0.9
     sorted_keys = sorted(zip(uncertainty, keys), key=lambda x: x[0], reverse=True)
 
     for i in xrange(0, len(sorted_keys), len(sorted_keys)/10):
@@ -102,60 +97,52 @@ def criterium(uncertainty, correct, keys):
     print 'Chosen {0} keys with threshold {1}'.format(len(sorted_keys), threshold)
     return sorted_keys
 
-
-class SamplePool(object):
-
-    def __init__(self):
-        pass
-
-
-class Policy(object):
-    pass
-
-class Scorer(object):
-    pass
-
-
-def setup():
-
-    db_path = ''
-    scorer = Scorer()
-    policy = Policy()
-
-    pool = SamplePool(db_path, scorer, policy)
-
-    epochs = 10
-
-    for e in xrange(epochs):
-        # run epoch
-        for batch in pool:
-            pass
-
-        SamplePool.reset()
-
+# class SamplePool(object):
+#
+#     def __init__(self):
+#         pass
+#
+#
+# class Policy(object):
+#     pass
+#
+# class Scorer(object):
+#     pass
+#
+#
+# def setup():
+#
+#     db_path = ''
+#     scorer = Scorer()
+#     policy = Policy()
+#
+#     pool = SamplePool(db_path, scorer, policy)
+#
+#     epochs = 10
+#
+#     for e in xrange(epochs):
+#         # run epoch
+#         for batch in pool:
+#             pass
+#
+#         SamplePool.reset()
 
 
-
-def choose_active(model_file, pretrained_net, mean_file, db, batch_size, num_batches_to_choose, total_num_batches,
-                  input_shape, skip_keys=set(), used_samples=set(), max_samples_to_use=-1):
+def choose_active(net, db, db_len, num_batches_to_choose, skip_keys=set()):
 
     print 'Choosing active samples....'
 
-    total_num_samples = total_num_batches * batch_size - len(skip_keys)
-    total_num_batches = int(math.ceil(float(total_num_samples) / batch_size))
-    total_num_samples = total_num_batches * batch_size
+    total_num_samples = db_len - len(skip_keys)
+    total_num_batches = total_num_samples / net.batch_size
+    total_num_samples = total_num_batches * net.batch_size
 
     num_batches_to_choose = min(num_batches_to_choose, total_num_batches)
-    net = caffe.Net(model_file, pretrained_net, caffe.TEST)
     env = lmdb.open(db, readonly=True)
 
+    # reserve storage for outputs
     uncert = np.zeros(total_num_samples, dtype=np.float32)
     correct = np.zeros(total_num_samples, dtype=bool)
     keys = np.zeros(total_num_samples, dtype=np.object)
-
-    global SAMPLE_MEAN
-    if SAMPLE_MEAN is None:
-        SAMPLE_MEAN = read_meanfile(mean_file)
 
     with env.begin() as txn:
         cursor = txn.cursor()
@@ -163,10 +150,10 @@ def choose_active(model_file, pretrained_net, mean_file, db, batch_size, num_bat
 
         for batch_num in xrange(total_num_batches):
             utils.wait_bar('Batch number', '', batch_num + 1, total_num_batches)
-            beg = batch_num * batch_size
-            end = beg + batch_size
+            beg = batch_num * net.batch_size
+            end = beg + net.batch_size
 
-            batch = build_batch(cursor, batch_size, input_shape, skip_keys)
+            batch = build_batch(cursor, net.batch_size, net.input_shape, skip_keys)
 
             if batch is None:
                 uncert = uncert[:beg]
@@ -176,9 +163,9 @@ def choose_active(model_file, pretrained_net, mean_file, db, batch_size, num_bat
                 break
 
             X, y, batch_keys = batch
-            X -= SAMPLE_MEAN
-
-            uncert[beg:end], correct[beg:end] = uncertainty_dropout_sum(X, y, net)
+            output = net.forward(X)[0]
+            uncert[beg:end] = utils.entropy(utils.softmax(output))
+            correct[beg:end] = np.equal(output.argmax(axis=1), y)
             keys[beg:end] = batch_keys
 
     env.close()
@@ -187,7 +174,7 @@ def choose_active(model_file, pretrained_net, mean_file, db, batch_size, num_bat
 
     chosen_keys = criterium(uncert, correct, keys)
 
-    num_to_return = min((len(chosen_keys) / batch_size), num_batches_to_choose) * batch_size
+    num_to_return = min((len(chosen_keys) / net.batch_size), num_batches_to_choose) * net.batch_size
     chosen_keys = chosen_keys[:num_to_return]
     skip_keys.update(chosen_keys)
 

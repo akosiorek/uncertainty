@@ -14,7 +14,6 @@ def wait_bar(pre_msg, post_msg, counter, limit):
 
 def entropy(x):
     y = x / np.tile(np.sum(x, axis=1)[:, np.newaxis], (1, x.shape[1]))
-    # print '1', np.where(y == 1), '0', np.where(y == 0), y.shape
 
     index = (y != 0)
     y[index] = y[index] * np.log(y[index])

@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import os
 import numpy as np
 
@@ -10,7 +8,7 @@ import db
 import utils
 import proto
 import samples
-import learn
+import config
 
 
 class Net(caffe.Net):
@@ -45,7 +43,7 @@ class Net(caffe.Net):
         self.mean = samples.read_meanfile(self.mean_path)
 
     def prepare_deploy_net(self, net_path):
-        deploy_net = utils.create_temp_path(net_path + '.deploy' + learn.POSTFIX)
+        deploy_net = utils.create_temp_path(net_path + '.deploy' + config.POSTFIX)
         proto.prepare_deploy_net(net_path, deploy_net, self.batch_size, self.input_shape)
         return deploy_net
 

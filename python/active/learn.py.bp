@@ -23,20 +23,29 @@ import samples
 import proto
 import utils
 import net
-import config
+
+OUTPUT_LAYERS = ['ip2']
+CAFFE_EXEC = '../build/tools/caffe'
+MODEL_FOLDER = 'models/uncertainty'
+POSTFIX = '.active'
+EPOCH_FILE = 'epochs.txt'
+
+MAX_EPOCHS = 10
+BATCHES_PER_RUN = 100
+ITERS_TO_INIT = 1000
 
 
 def init_network(solver_path):
     """# 1. Initialize the net by training with an initial solver"""
     print 'Initializing net..."'
-    cmd = '{0} train --solver={1}'.format(config.CAFFE_EXEC, solver_path)
+    cmd = '{0} train --solver={1}'.format(CAFFE_EXEC, solver_path)
     with open('log.txt', 'w') as f:
         subprocess.call(cmd.split(' '), stdout=f, stderr=subprocess.STDOUT)
 
 
 def train_network(solver_path, snapshot_path):
     print 'Training net..."'
-    cmd = '{0} train --solver={1} --snapshot={2}'.format(config.CAFFE_EXEC, solver_path, snapshot_path)
+    cmd = '{0} train --solver={1} --snapshot={2}'.format(CAFFE_EXEC, solver_path, snapshot_path)
     with open('log.txt', 'a') as f:
         subprocess.call(cmd.split(' '), stdout=f, stderr=subprocess.STDOUT)
 
@@ -44,53 +53,47 @@ def train_network(solver_path, snapshot_path):
 def learn(solver_path, snapshot_path, iters_to_init):
     net_path = proto.get_net_from_solver(solver_path)
     train_db_path = proto.get_db_from_net(net_path)
-    train_db_len = db.size(train_db_path)
 
-# prepare path to the temporary model files
-    active_solver_path = utils.create_temp_path(solver_path + config.POSTFIX)
-    active_net_path = utils.create_temp_path(net_path + config.POSTFIX)
-    active_db_path = utils.create_temp_path(train_db_path + config.POSTFIX)
+    active_solver_path = utils.create_temp_path(solver_path + POSTFIX)
+    active_net_path = utils.create_temp_path(net_path + POSTFIX)
+    active_db_path = utils.create_temp_path(train_db_path + POSTFIX)
+    deploy_net_path = utils.create_temp_path(net_path + '.deploy' + POSTFIX)
 
-# prepare temporary model files
-    proto.prepare_net(net_path, active_net_path, active_db_path)
-    snapshot_prefix, snapshot_iter = proto.prepare_solver(
-        solver_path, active_solver_path, active_net_path, snapshot_path, iters_to_init
-    )
+    # TODO: remove; for now needed since the active db does not exist yet and init doesn't work
+    proto.prepare_net(net_path, active_net_path, train_db_path)
+    snapshot_prefix, snapshot_iter = proto.prepare_solver(solver_path, active_solver_path, active_net_path, snapshot_path, iters_to_init)
 
-    # recover the snapshot folder
-    snapshot_path = '/'.join(snapshot_prefix.split('/')[:-1])
-    epoch_file = os.path.join(snapshot_path, config.EPOCH_FILE)
-
-    # deploy net
-    deploy_net = net.Net(active_net_path, output_layers=config.OUTPUT_LAYERS)
-    deploy_net.init()
-
-# initialize net
     solverstate_path = proto.solverstate_path(snapshot_prefix, iters_to_init)
     if not os.path.exists(solverstate_path):
-        if os.path.exists(active_db_path):
-            shutil.rmtree(active_db_path)
-        shutil.copytree(train_db_path, active_db_path)
         init_network(active_solver_path)
 
-# do the real learning
-    print 'train samples:', train_db_len
-    for epoch in xrange(config.MAX_EPOCHS):
-        print 'Epoch #{0}'.format(epoch)
-        epoch_used_samples = set()
+    proto.prepare_net(net_path, active_net_path, active_db_path)
 
-        while len(epoch_used_samples) < train_db_len:
+    # deploy net
+    net = net.Net(active_net_path, output_layers=OUTPUT_LAYERS)
+
+    epoch_file = os.path.join(snapshot_path, EPOCH_FILE)
+    train_db_len = db.size(train_db_path)
+    print 'train samples:', train_db_len
+    for epoch in xrange(MAX_EPOCHS):
+        print 'Epoch #{0}'.format(epoch)
+        used_samples = set()
+
+        while len(used_samples) < train_db_len:
 
             solverstate_path = proto.solverstate_path(snapshot_prefix, snapshot_iter)
             caffemodel_path = proto.caffemodel_path(snapshot_prefix, snapshot_iter)
 
             print 'Using snapshot iter #{0}'.format(snapshot_iter)
-            deploy_net.load_model(caffemodel_path)
-            active_samples = samples.choose_active(deploy_net, train_db_path, train_db_len, config.BATCHES_PER_RUN,
-                                                   epoch_used_samples)
+
+            active_samples = samples.choose_active(
+                    deploy_net_path, caffemodel_path, mean_file, train_db_path,
+                    batch_size, BATCHES_PER_RUN, train_db_len/batch_size, input_shape, used_samples
+            )
+
+            iters_to_do = min(len(active_samples) / batch_size, BATCHES_PER_RUN)
 
             # check if it makes sense to continue
-            iters_to_do = len(active_samples) / deploy_net.batch_size
             if iters_to_do == 0:
                 break
 
@@ -106,21 +109,17 @@ if __name__ == '__main__':
     args = sys.argv[1:]
     solver_path = args[0]
 
-    snapshot_path = None
-    iters_to_init = config.ITERS_TO_INIT
-    max_samples_to_use = sys.maxint
-
     if len(args) > 1:
         snapshot_path = args[1]
         if not os.path.exists(snapshot_path):
             os.mkdir(snapshot_path)
+    else:
+        snapshot_path = None
 
     if len(args) > 2:
         iters_to_init = int(args[2])
-
-    if len(args) > 3:
-        max_samples_to_use = int(args[3])
-
+    else:
+        iters_to_init = ITERS_TO_INIT
 
     caffe.set_mode_gpu()
     learn(solver_path, snapshot_path, iters_to_init)
