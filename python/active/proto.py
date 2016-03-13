@@ -7,7 +7,7 @@ from caffe.proto.caffe_pb2 import SolverParameter, NetParameter, BlobShape
 
 def load_proto(path, proto_type):
     proto = proto_type()
-    data = open(path).read()
+    data = open(path, 'rb').read()
     text_format.Merge(data, proto)
     return proto
 
@@ -95,9 +95,8 @@ def prepare_deploy_net(net_path, out_path, batch_size, input_size):
                 layers_to_remove.append(i)
                 break
 
-
     input_shape = BlobShape()
-    input_shape.dim.extend([batch_size])
+    input_shape.dim.append(batch_size)
     input_shape.dim.extend(input_size)
 
     proto.input.extend([proto.layer[0].top[0]])

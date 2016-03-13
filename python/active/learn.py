@@ -63,7 +63,6 @@ def learn(solver_path, snapshot_path, iters_to_init):
 
     # deploy net
     deploy_net = net.Net(active_net_path, output_layers=config.OUTPUT_LAYERS)
-    deploy_net.init()
 
 # initialize net
     solverstate_path = proto.solverstate_path(snapshot_prefix, iters_to_init)
@@ -86,8 +85,7 @@ def learn(solver_path, snapshot_path, iters_to_init):
 
             print 'Using snapshot iter #{0}'.format(snapshot_iter)
             deploy_net.load_model(caffemodel_path)
-            active_samples = samples.choose_active(deploy_net, train_db_path, train_db_len, config.BATCHES_PER_RUN,
-                                                   epoch_used_samples)
+            active_samples = samples.choose_active(deploy_net, train_db_path, config.BATCHES_PER_RUN, epoch_used_samples)
 
             # check if it makes sense to continue
             iters_to_do = len(active_samples) / deploy_net.batch_size

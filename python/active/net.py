@@ -7,7 +7,6 @@ import caffe
 import db
 import utils
 import proto
-import samples
 import config
 
 
@@ -39,8 +38,12 @@ class Net(caffe.Net):
         self.net = None
 
     def load_mean(self, mean_path):
+        print 'Reading mean file from {}'.format(mean_path)
         self.mean_path = mean_path
-        self.mean = samples.read_meanfile(self.mean_path)
+        blob = caffe.proto.caffe_pb2.BlobProto()
+        blob.ParseFromString(open(self.mean_path, 'rb').read())
+        arr = np.array(caffe.io.blobproto_to_array(blob))
+        self.mean = arr[0]
 
     def prepare_deploy_net(self, net_path):
         deploy_net = utils.create_temp_path(net_path + '.deploy' + config.POSTFIX)
