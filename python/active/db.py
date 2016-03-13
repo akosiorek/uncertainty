@@ -6,7 +6,7 @@ import lmdb
 
 import caffe.proto.caffe_pb2
 
-LOG_EVERY = 10000
+import config
 
 
 def extract_samples(input_db, output_db, sample_keys, shuffle=True):
@@ -44,12 +44,12 @@ def extract_samples(input_db, output_db, sample_keys, shuffle=True):
                 txn_out.put(str_id(id), cursor_in.get(key))
 
                 num += 1
-                if num % LOG_EVERY == 0:
+                if num % config.LOG_EVERY == 0:
                     print 'Stored {0:8} samples in {1}'.format(num, output_db)
 
     env_in.close()
     env_out.close()
-    if num % LOG_EVERY != 0:
+    if num % config.LOG_EVERY != 0:
         print 'Stored {0:8} samples in {1}'.format(num, output_db)
 
     if return_keys:

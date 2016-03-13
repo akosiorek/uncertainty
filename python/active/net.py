@@ -51,7 +51,7 @@ class Net(caffe.Net):
         return deploy_net
 
     def prepare_deploy(self):
-
+        # TODO move it to some other place, net shouldn't need access to any dataset at init time
         if self.input_shape is None:
             db_path = proto.get_db_from_net(self.net_path)
             self.input_shape = db.entry_shape(db_path)

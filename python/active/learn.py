@@ -64,6 +64,9 @@ def learn(solver_path, snapshot_path, iters_to_init):
     # deploy net
     deploy_net = net.Net(active_net_path, output_layers=config.OUTPUT_LAYERS)
 
+    epoch_used_samples = set()
+    dataset = samples.Dataset(train_db_path, deploy_net.batch_size, epoch_used_samples)
+
 # initialize net
     solverstate_path = proto.solverstate_path(snapshot_prefix, iters_to_init)
     if not os.path.exists(solverstate_path):
@@ -76,7 +79,7 @@ def learn(solver_path, snapshot_path, iters_to_init):
     print 'train samples:', train_db_len
     for epoch in xrange(config.MAX_EPOCHS):
         print 'Epoch #{0}'.format(epoch)
-        epoch_used_samples = set()
+        epoch_used_samples.clear()
 
         while len(epoch_used_samples) < train_db_len:
 
@@ -85,7 +88,11 @@ def learn(solver_path, snapshot_path, iters_to_init):
 
             print 'Using snapshot iter #{0}'.format(snapshot_iter)
             deploy_net.load_model(caffemodel_path)
-            active_samples = samples.choose_active(deploy_net, train_db_path, config.BATCHES_PER_RUN, epoch_used_samples)
+            active_samples = samples.choose_active(deploy_net, dataset, config.BATCHES_PER_RUN)
+
+            epoch_used_samples.update(active_samples)
+            assert len(active_samples) <= int(max(active_samples)), \
+                'Index of the highest sample is lower than the number of used samples'
 
             # check if it makes sense to continue
             iters_to_do = len(active_samples) / deploy_net.batch_size

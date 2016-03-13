@@ -4,6 +4,7 @@ import lmdb
 
 import utils
 import db
+import config
 
 
 # class SamplePool(object):
@@ -112,22 +113,18 @@ def criterium(uncertainty, correct, keys):
 
     # keys = keys[correct]
     # uncertainty = uncertainty[correct]
-    threshold = 0.9
     sorted_keys = sorted(zip(uncertainty, keys), key=lambda x: x[0], reverse=True)
 
     for i in xrange(0, len(sorted_keys), len(sorted_keys)/10):
         print sorted_keys[i]
 
-    sorted_keys = [x[1] for x in sorted_keys if x[0] > threshold]
-    print 'Chosen {0} keys with threshold {1}'.format(len(sorted_keys), threshold)
+    sorted_keys = [x[1] for x in sorted_keys if x[0] > config.UNCERTAINTY_THRESOLD]
+    print 'Chosen {0} keys with threshold {1}'.format(len(sorted_keys), config.UNCERTAINTY_THRESOLD)
     return sorted_keys
 
 
-def choose_active(net, db_path, num_batches_to_choose, skip_keys=set()):
-
+def choose_active(net, dataset, num_batches_to_choose):
     print 'Choosing active samples....'
-
-    dataset = Dataset(db_path, net.batch_size, skip_keys)
 
     total_num_batches = dataset.num_batches()
     total_num_samples = len(dataset)
@@ -158,11 +155,7 @@ def choose_active(net, db_path, num_batches_to_choose, skip_keys=set()):
 
     num_to_return = min((len(chosen_keys) / net.batch_size), num_batches_to_choose) * net.batch_size
     chosen_keys = chosen_keys[:num_to_return]
-    skip_keys.update(chosen_keys)
-
-    print 'Used {0} samples. Max used sample = {1}'.format(len(skip_keys), max(skip_keys))
     print 'Returning {0} new samples'.format(len(chosen_keys))
-    assert len(skip_keys) <= int(max(skip_keys)), 'Index of the highest sample is lower than the number of used samples'
     return chosen_keys
 
 
