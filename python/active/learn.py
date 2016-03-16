@@ -65,7 +65,8 @@ def learn(solver_path, snapshot_path, iters_to_init, max_samples_to_use):
 
     # deploy net
     # deploy_net = net.Net(active_net_path, output_layers=config.OUTPUT_LAYERS)
-    deploy_net = net.DropoutNet(active_net_path, config.DROPOUT_ITERS, aggregate='mean', output_layers=config.OUTPUT_LAYERS)
+    deploy_net = net.DropoutNet(active_net_path, config.DROPOUT_ITERS, aggregate='mean',
+                                output_layers=config.OUTPUT_LAYERS, output_processor=utils.softmax)
 
     epoch_used_samples = set()
     dataset = samples.Dataset(train_db_path, deploy_net.batch_size, epoch_used_samples)

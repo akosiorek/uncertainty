@@ -12,7 +12,7 @@ import config
 
 class Net(caffe.Net):
     def __init__(self, net_path, trained_path=None, output_layers=[], is_deploy=False, mean_path=None,
-                 batch_size=None, input_shape=None):
+                 batch_size=None, input_shape=None, output_processor=None):
 
         self.net_path = net_path
         self.trained_path = trained_path
@@ -23,6 +23,7 @@ class Net(caffe.Net):
         self.batch_size = batch_size
         self.mean_path = mean_path
         self.input_shape = input_shape
+        self.output_processor = None
 
         if self.batch_size is None or self.mean_path is None:
             batch_size, mean_path = proto.get_batch_mean_from_net(self.net_path)
@@ -81,7 +82,16 @@ class Net(caffe.Net):
 
     def forward_impl(self, X, *args, **kwargs):
         self.net.forward(data=X, *args, **kwargs)
-        return [self.net.blobs[name].data for name in self.output_layers]
+        return self.process_output([self.net.blobs[name].data for name in self.output_layers])
+
+    def process_output(self, output):
+        if self.output_processor is None:
+            return output
+
+        if hasattr(self.output_processor, '__iter__'):
+            return [func(obj) for func, obj in zip(self.output_processor, output)]
+
+        return [self.output_processor(obj) for obj in output]
 
 
 class DropoutNet(Net):

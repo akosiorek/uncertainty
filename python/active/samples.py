@@ -169,7 +169,7 @@ def choose_active(net, dataset, num_batches_to_choose):
 
         X, y, batch_keys = batch
         output = net.forward(X)[0]
-        uncert[beg:end] = utils.entropy(utils.softmax(output))
+        uncert[beg:end] = utils.entropy(output)
         correct[beg:end] = np.equal(output.argmax(axis=1), y)
         keys[beg:end] = batch_keys
         labels[beg:end] = y
