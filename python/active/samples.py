@@ -1,10 +1,11 @@
+import config
+
 import numpy as np
 import caffe
 import lmdb
 
 import utils
 import db
-import config
 
 
 # class SamplePool(object):
@@ -109,7 +110,7 @@ class Dataset(object):
                     index = 0
 
 
-def criterium(uncertainty, correct, keys):
+def criterium(uncertainty, correct, keys, labels, num_samples_to_choose):
 
     # keys = keys[correct]
     # uncertainty = uncertainty[correct]
@@ -120,7 +121,31 @@ def criterium(uncertainty, correct, keys):
 
     sorted_keys = [x[1] for x in sorted_keys if x[0] > config.UNCERTAINTY_THRESOLD]
     print 'Chosen {0} keys with threshold {1}'.format(len(sorted_keys), config.UNCERTAINTY_THRESOLD)
-    return sorted_keys
+    return sorted_keys[:num_samples_to_choose]
+
+
+def criterium_balanced(uncertainty, correct, keys, labels, num_samples_to_choose):
+
+    classes = {}
+    for label, key, unc in zip(labels, keys, uncertainty):
+        if label not in classes:
+            classes[label] = []
+
+        if unc > config.UNCERTAINTY_THRESOLD:
+            classes[label].append((unc, key))
+
+    for key in classes.keys():
+        classes[key].sort(key=lambda x: x[0], reverse=True)
+        classes[key] = [x[1] for x in classes[key]]
+
+    samples_per_class = 2 * num_samples_to_choose / len(classes.keys())
+    for key in classes.keys():
+        classes[key] = classes[key][:samples_per_class]
+
+    chosen_keys = list(utils.roundrobin(*classes.values()))
+
+    print 'Chosen {0} keys with threshold {1}'.format(len(chosen_keys), config.UNCERTAINTY_THRESOLD)
+    return chosen_keys[:num_samples_to_choose]
 
 
 def choose_active(net, dataset, num_batches_to_choose):
@@ -134,6 +159,7 @@ def choose_active(net, dataset, num_batches_to_choose):
     uncert = np.zeros(total_num_samples, dtype=np.float32)
     correct = np.zeros(total_num_samples, dtype=bool)
     keys = np.zeros(total_num_samples, dtype=np.object)
+    labels = np.zeros(total_num_samples, dtype=np.uint8)
 
     dataset.open()
     for batch_num, batch in enumerate(dataset):
@@ -146,14 +172,16 @@ def choose_active(net, dataset, num_batches_to_choose):
         uncert[beg:end] = utils.entropy(utils.softmax(output))
         correct[beg:end] = np.equal(output.argmax(axis=1), y)
         keys[beg:end] = batch_keys
+        labels[beg:end] = y
 
     dataset.close()
     print
     print 'Accuracy = {0}, mean uncertainty = {1}'.format(correct.mean(), uncert.mean())
 
-    chosen_keys = criterium(uncert, correct, keys)
+    num_samples_to_choose = num_batches_to_choose * net.batch_size
+    chosen_keys = criterium_balanced(uncert, correct, keys, labels, num_samples_to_choose)
 
-    num_to_return = min((len(chosen_keys) / net.batch_size), num_batches_to_choose) * net.batch_size
+    num_to_return = (len(chosen_keys) / net.batch_size) * net.batch_size
     chosen_keys = chosen_keys[:num_to_return]
     print 'Returning {0} new samples'.format(len(chosen_keys))
     return chosen_keys

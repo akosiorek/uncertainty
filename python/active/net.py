@@ -104,7 +104,7 @@ class DropoutNet(Net):
 
     def __init__(self, net_path, dropout_iters, aggregate='vote', *args, **kwargs):
         super(DropoutNet, self).__init__(net_path, *args, **kwargs)
-        self.droput_iters = dropout_iters
+        self.dropout_iters = dropout_iters
 
         assert len(self.output_layers) == 1, 'DropoutNet supports only a single output layer'
 
@@ -120,12 +120,12 @@ class DropoutNet(Net):
 
         result = []
         for i in xrange(len(r)):
-            shape = [self.droput_iters] + list(r[i].shape)
+            shape = [self.dropout_iters] + list(r[i].shape)
             mat = np.ndarray(shape, dtype=np.float32)
             mat[0, :, :] = r[i]
             result.append(mat)
 
-        for i in xrange(1, self.droput_iters - 1):
+        for i in xrange(1, self.dropout_iters):
             r = super(DropoutNet, self).forward_impl(X, *args, **kwargs)
             for j in xrange(len(result)):
                 result[j][i, :, :] = r[j]

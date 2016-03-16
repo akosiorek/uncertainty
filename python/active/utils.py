@@ -2,6 +2,7 @@ import os
 import sys
 import re
 import shutil
+import itertools
 
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
@@ -22,8 +23,16 @@ def entropy(x):
 
 
 def softmax(x):
-    e = np.exp(x)
-    return e / np.tile(np.sum(e, axis=1)[:, np.newaxis], (1, x.shape[1]))
+    try:
+        e = np.exp(x - x.max(axis=-1)[:, np.newaxis])
+    except FloatingPointError as err:
+        print 'max:'
+        print x.max(axis=-1)
+        print 'x:'
+        print x
+
+        raise
+    return e / e.sum(axis=-1)[:, np.newaxis]
 
 
 def second_max(x):
@@ -101,3 +110,17 @@ def append_to_file(path, msg, sep='\n'):
 if __name__ == '__main__':
     for num, snapshot in get_snapshot_files(sys.argv[1], every_iter=int(sys.argv[2])):
         print num, snapshot
+
+
+def roundrobin(*iterables):
+    "roundrobin('ABC', 'D', 'EF') --> A D E B F C"
+    # Recipe credited to George Sakkis
+    pending = len(iterables)
+    nexts = itertools.cycle(iter(it).next for it in iterables)
+    while pending:
+        try:
+            for next in nexts:
+                yield next()
+        except StopIteration:
+            pending -= 1
+            nexts = itertools.cycle(itertools.islice(nexts, pending))

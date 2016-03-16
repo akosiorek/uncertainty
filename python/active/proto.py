@@ -1,3 +1,5 @@
+import config
+
 import os
 from google.protobuf import text_format
 
@@ -48,7 +50,7 @@ def prepare_solver(solver_path, out_path, prepared_net, snapshot_path=None, iter
     print 'Preparing solver.prototxt...'
     proto = load_proto(solver_path, SolverParameter)
 
-    proto.snapshot = 0
+    proto.snapshot = config.SNAPSHOT_EVERY_ITER
     proto.snapshot_after_train = True
     proto.net = prepared_net
     proto.test_initialization = False

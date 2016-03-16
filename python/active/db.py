@@ -1,3 +1,5 @@
+import config
+
 import os
 import shutil
 import random
@@ -5,8 +7,6 @@ import random
 import lmdb
 
 import caffe.proto.caffe_pb2
-
-import config
 
 
 def extract_samples(input_db, output_db, sample_keys, shuffle=True):
@@ -25,7 +25,7 @@ def extract_samples(input_db, output_db, sample_keys, shuffle=True):
         return_keys = True
         keys = []
         with env_in.begin() as txn_in:
-            for key, data in txn_in:
+            for key, data in txn_in.cursor():
                 keys.append(key)
         random.shuffle(keys)
         sample_keys = keys[:sample_keys]
